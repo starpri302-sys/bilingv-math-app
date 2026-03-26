@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@layer base {
+  .prose img {
+    @apply rounded-2xl shadow-sm my-4 max-w-full h-auto;
+  }
+  .prose iframe {
+    @apply rounded-2xl shadow-sm my-4 w-full aspect-video;
+  }
+  .prose ul {
+    @apply list-disc list-inside my-2;
+  }
+  .prose ol {
+    @apply list-decimal list-inside my-2;
+  }
+  .ql-editor {
+    @apply min-h-[150px] text-lg;
+  }
+  .ql-container.ql-snow {
+    border: none !important;
+  }
+  .ql-toolbar.ql-snow {
+    border: none !important;
+    border-bottom: 1px solid #f5f5f4 !important; /* stone-100 */
+    @apply bg-stone-50;
+  }
+}
