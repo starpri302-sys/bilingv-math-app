@@ -93,7 +93,7 @@ export default function BilingualEditor({ onClose, initialData }: BilingualEdito
     setSaving(true);
     try {
       const userInfo = {
-        uid: user.uid,
+        uid: user.uid || user.id,
         username: profile?.full_name || user.email || 'Anonymous',
         role: profile?.role || 'guest'
       };
@@ -270,6 +270,18 @@ export default function BilingualEditor({ onClose, initialData }: BilingualEdito
                         className="bg-white"
                       />
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-stone-400">
+                      <Info className="w-4 h-4" />
+                      Дополнительно
+                    </label>
+                    <textarea
+                      value={formData.translations[lang.code]?.additional || ''}
+                      onChange={(e) => handleTranslationChange(lang.code, 'additional', e.target.value)}
+                      className="w-full p-4 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium h-32"
+                      placeholder="Дополнительная информация..."
+                    />
                   </div>
                 </motion.div>
               ))}

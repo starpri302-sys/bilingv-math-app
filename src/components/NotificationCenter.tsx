@@ -146,7 +146,7 @@ export default function NotificationCenter() {
                         </span>
                         {notification.term_id && (
                           <Link
-                            to={`/terms/${notification.term_id}`}
+                            to={`/term/${notification.term_id}`}
                             onClick={() => {
                               setIsOpen(false);
                               handleMarkRead(notification.id);
