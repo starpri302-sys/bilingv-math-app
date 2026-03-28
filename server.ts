@@ -7,7 +7,7 @@ import { createServer as createViteServer } from "vite";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
-import { Pool } from "pg";
+import { PGlite } from "@electric-sql/pglite";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
@@ -17,9 +17,29 @@ dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret";
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+const pglite = new PGlite("./pgdata");
+
+const pool = {
+  query: async (text: string, params?: any[]) => {
+    const res = await pglite.query(text, params);
+    return {
+      rows: res.rows,
+      rowCount: (res as any).affectedRows ?? res.rows.length,
+    };
+  },
+  connect: async () => {
+    return {
+      query: async (text: string, params?: any[]) => {
+        const res = await pglite.query(text, params);
+        return {
+          rows: res.rows,
+          rowCount: (res as any).affectedRows ?? res.rows.length,
+        };
+      },
+      release: () => {},
+    };
+  },
+};
 
 async function logAction(userId: string | null, username: string | null, action: string, details: any) {
   try {

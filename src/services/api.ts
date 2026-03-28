@@ -109,7 +109,7 @@ export const api = {
     const res = await fetch('/api/terms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...term, id: Math.random().toString(36).substr(2, 9), user_role: userRole })
+      body: JSON.stringify({ ...term, user_role: userRole })
     });
     return handleResponse(res);
   },
@@ -146,7 +146,7 @@ export const api = {
     const res = await fetch(`/api/terms/${termId}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...comment, id: Math.random().toString(36).substr(2, 9) })
+      body: JSON.stringify(comment)
     });
     return handleResponse(res);
   },

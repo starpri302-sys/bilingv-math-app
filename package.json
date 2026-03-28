@@ -12,6 +12,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.4.2",
     "@google/genai": "^1.29.0",
     "@lexical/link": "^0.42.0",
     "@lexical/list": "^0.42.0",
