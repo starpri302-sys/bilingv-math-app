@@ -17,24 +17,8 @@ dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret";
 
-// Robust database configuration
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  console.error("FATAL ERROR: DATABASE_URL is not defined in environment variables.");
-  console.error("Please check your .env file or environment settings.");
-} else {
-  console.log("DATABASE_URL is defined. Attempting to initialize connection pool...");
-}
-
 const pool = new Pool({
-  connectionString: databaseUrl,
-  // Add some safety for parsing
-  ssl: databaseUrl?.includes('localhost') ? false : { rejectUnauthorized: false }
-});
-
-pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
+  connectionString: process.env.DATABASE_URL,
 });
 
 async function logAction(userId: string | null, username: string | null, action: string, details: any) {
