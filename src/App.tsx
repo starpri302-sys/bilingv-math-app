@@ -8,6 +8,7 @@ import { AuthProvider } from './store/authContext';
 import Home from './pages/Home';
 import TermDetail from './pages/TermDetail';
 import Profile from './pages/Profile';
+import UserProfile from './pages/UserProfile';
 import AdminPanel from './pages/AdminPanel';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -29,6 +30,7 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/term/:id" element={<TermDetail />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/user/:id" element={<UserProfile />} />
               <Route path="/admin" element={<AdminPanel />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />

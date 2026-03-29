@@ -3,9 +3,10 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import BilingualEditor from '../components/BilingualEditor';
 import SEO from '../components/SEO';
+import UserAvatar from '../components/UserAvatar';
 import { useAuth } from '../store/authContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Book, Info, Lightbulb, Share2, Languages, Edit3, Trash2 } from 'lucide-react';
+import { ArrowLeft, Book, Info, Lightbulb, Share2, Languages, Edit3, Trash2, User } from 'lucide-react';
 
 export default function TermDetail() {
   const { id } = useParams<{ id: string }>();
@@ -184,6 +185,34 @@ export default function TermDetail() {
                     </p>
                   </section>
                 )}
+              </div>
+
+              {/* Author Info */}
+              <div className="pt-6 border-t border-stone-100 flex items-center justify-between">
+                <Link 
+                  to={`/user/${term.created_by}`}
+                  className="flex items-center gap-3 group/author hover:bg-stone-50 p-2 -ml-2 rounded-2xl transition-all"
+                >
+                  <UserAvatar 
+                    user={{
+                      username: term.author_name,
+                      full_name: term.author_full_name,
+                      avatar: term.author_avatar
+                    }} 
+                    size="md" 
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Автор термина</span>
+                    <span className="text-sm font-bold text-stone-900 group-hover/author:text-emerald-600 transition-colors">
+                      {term.author_full_name || term.author_name || 'Аноним'}
+                    </span>
+                  </div>
+                </Link>
+                
+                <div className="flex items-center gap-2 text-stone-400 text-[10px] font-bold uppercase tracking-widest">
+                  <User className="w-3 h-3" />
+                  <span>Класс {term.grade}</span>
+                </div>
               </div>
             </div>
           );

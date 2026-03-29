@@ -67,7 +67,7 @@ export const api = {
   async saveUser(user: any) {
     const res = await fetch('/api/users', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
       body: JSON.stringify(user)
     });
     return handleResponse(res);

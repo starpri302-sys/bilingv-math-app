@@ -431,7 +431,7 @@ async function startServer() {
 
   // Users API
   app.get("/api/users/:id", async (req, res) => {
-    const userRes = await pool.query("SELECT * FROM users WHERE id = $1", [req.params.id]);
+    const userRes = await pool.query("SELECT id, username, full_name, school, grade, avatar, role FROM users WHERE id = $1", [req.params.id]);
     res.json(userRes.rows[0] || null);
   });
 
@@ -558,8 +558,19 @@ async function startServer() {
   });
 
   app.post("/api/users", async (req, res) => {
-    const { id, username, email, role, full_name, school, grade, avatar } = req.body;
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "No token provided" });
+    const token = authHeader.split(' ')[1];
+
     try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      const { id, username, email, role, full_name, school, grade, avatar } = req.body;
+
+      // Ensure user can only update their own profile unless they are an admin
+      if (decoded.id !== id && decoded.role !== 'super_admin' && decoded.role !== 'chief_editor') {
+        return res.status(403).json({ error: "Forbidden: You can only update your own profile" });
+      }
+
       await pool.query(`
         INSERT INTO users (id, username, email, role, full_name, school, grade, avatar)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -572,7 +583,8 @@ async function startServer() {
       `, [id, username, email, role || 'student', full_name, school, grade, avatar]);
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: "Internal server error" });
+      console.error('Error saving user:', error);
+      res.status(401).json({ error: "Invalid token or internal error" });
     }
   });
 
@@ -720,26 +732,31 @@ async function startServer() {
   app.get("/api/terms", async (req, res) => {
     try {
       const { status, subjectId, grade, createdBy } = req.query;
-      let query = "SELECT * FROM terms WHERE 1=1";
+      let query = `
+        SELECT t.*, u.username as author_name, u.avatar as author_avatar, u.full_name as author_full_name
+        FROM terms t
+        LEFT JOIN users u ON t.created_by = u.id
+        WHERE 1=1
+      `;
       const params: any[] = [];
       let paramIdx = 1;
       if (status) {
-        query += ` AND status = $${paramIdx++}`;
+        query += ` AND t.status = $${paramIdx++}`;
         params.push(status);
       }
       if (subjectId) {
-        query += ` AND subject_id = $${paramIdx++}`;
+        query += ` AND t.subject_id = $${paramIdx++}`;
         params.push(subjectId);
       }
       if (grade) {
-        query += ` AND grade = $${paramIdx++}`;
+        query += ` AND t.grade = $${paramIdx++}`;
         params.push(grade);
       }
       if (createdBy) {
-        query += ` AND created_by = $${paramIdx++}`;
+        query += ` AND t.created_by = $${paramIdx++}`;
         params.push(createdBy);
       }
-      query += " ORDER BY created_at DESC";
+      query += " ORDER BY t.created_at DESC";
       const termsRes = await pool.query(query, params);
       const terms = termsRes.rows;
       
@@ -757,7 +774,12 @@ async function startServer() {
 
   app.get("/api/terms/:id", async (req, res) => {
     try {
-      const termRes = await pool.query("SELECT * FROM terms WHERE id = $1", [req.params.id]);
+      const termRes = await pool.query(`
+        SELECT t.*, u.username as author_name, u.avatar as author_avatar, u.full_name as author_full_name
+        FROM terms t
+        LEFT JOIN users u ON t.created_by = u.id
+        WHERE t.id = $1
+      `, [req.params.id]);
       const term = termRes.rows[0];
       if (term) {
         const transRes = await pool.query("SELECT * FROM term_translations WHERE term_id = $1", [term.id]);

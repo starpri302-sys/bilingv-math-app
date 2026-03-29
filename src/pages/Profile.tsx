@@ -2,13 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../store/authContext';
 import { api } from '../services/api';
 import { motion } from 'motion/react';
-import { User, Mail, School, GraduationCap, Save, ShieldCheck, Camera, Trash2, BookOpen, Clock, CheckCircle, Key, Eye, EyeOff, Lock } from 'lucide-react';
+import { User, Mail, School, GraduationCap, Save, ShieldCheck, Camera, Trash2, BookOpen, Clock, CheckCircle, Key, Eye, EyeOff, Lock, ChevronDown } from 'lucide-react';
 import UserAvatar from '../components/UserAvatar';
 import TermCard from '../components/TermCard';
 import { AnimatePresence } from 'motion/react';
 
 export default function Profile() {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, refreshProfile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     username: '',
@@ -83,6 +83,7 @@ export default function Profile() {
         email: user.email,
         role: profile?.role || 'student'
       });
+      await refreshProfile();
       setMessage('Профиль успешно обновлен!');
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
@@ -239,6 +240,25 @@ export default function Profile() {
               className="w-full p-4 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
               placeholder="Школа №1"
             />
+          </div>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-stone-400">
+              <GraduationCap className="w-4 h-4" />
+              Класс
+            </label>
+            <div className="relative">
+              <select
+                value={formData.grade}
+                onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
+                className="w-full p-4 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium appearance-none"
+              >
+                <option value="">Выберите класс</option>
+                {[5, 6, 7, 8, 9, 10, 11].map((g) => (
+                  <option key={g} value={g.toString()}>{g} класс</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400 pointer-events-none" />
+            </div>
           </div>
           <div className="space-y-2 sm:col-span-2">
             <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-stone-400">
