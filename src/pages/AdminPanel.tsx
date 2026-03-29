@@ -3,8 +3,9 @@ import { useAuth } from '../store/authContext';
 import { api } from '../services/api';
 import BilingualEditor from '../components/BilingualEditor';
 import UserAvatar from '../components/UserAvatar';
+import ConfirmModal from '../components/ConfirmModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { Shield, CheckCircle, Trash2, Clock, Info, Plus, Languages, Book, Calculator, Settings, Edit3, Terminal, Download, Database as DbIcon, Upload, FileJson } from 'lucide-react';
+import { Shield, CheckCircle, Trash2, Clock, Info, Plus, Languages, Book, Calculator, Settings, Edit3, Terminal, Download, Database as DbIcon, Upload, FileJson, X } from 'lucide-react';
 
 type AdminTab = 'moderation' | 'subjects' | 'languages' | 'users' | 'system';
 
@@ -18,6 +19,16 @@ export default function AdminPanel() {
   const [logs, setLogs] = useState<any[]>([]);
   const [fetching, setFetching] = useState(true);
   const [importing, setImporting] = useState(false);
+
+  // Modal states
+  const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void; isDestructive?: boolean }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    isDestructive: true
+  });
+  const [alertMessage, setAlertMessage] = useState<{ isOpen: boolean; title: string; message: string }>({ isOpen: false, title: '', message: '' });
 
   // Form states
   const [showForm, setShowForm] = useState(false);
@@ -68,6 +79,24 @@ export default function AdminPanel() {
     }
   };
 
+  const handleDeleteUser = async (userId: string) => {
+    if (!isSuperAdmin) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Удаление пользователя',
+      message: 'Вы уверены, что хотите удалить этого пользователя? Это действие нельзя отменить.',
+      onConfirm: async () => {
+        try {
+          await api.deleteUser(userId);
+          loadData();
+        } catch (error) {
+          console.error('Error deleting user:', error);
+          setAlertMessage({ isOpen: true, title: 'Ошибка', message: 'Не удалось удалить пользователя.' });
+        }
+      }
+    });
+  };
+
   const handleExportTerms = async () => {
     if (!isSuperAdmin) return;
     try {
@@ -81,7 +110,7 @@ export default function AdminPanel() {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Export error:', error);
-      alert('Ошибка при экспорте терминов');
+      setAlertMessage({ isOpen: true, title: 'Ошибка', message: 'Ошибка при экспорте терминов' });
     }
   };
 
@@ -89,29 +118,31 @@ export default function AdminPanel() {
     const file = e.target.files?.[0];
     if (!file || !isSuperAdmin) return;
 
-    if (!window.confirm('ВНИМАНИЕ: Импорт полностью заменит текущую базу терминов! Вы уверены?')) {
-      e.target.value = '';
-      return;
-    }
-
-    setImporting(true);
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      const res = await api.importTerms(profile?.role || '', data);
-      if (res.success) {
-        alert('База терминов успешно восстановлена!');
-        loadData();
-      } else {
-        alert(`Ошибка: ${res.error}`);
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Импорт терминов',
+      message: 'ВНИМАНИЕ: Импорт полностью заменит текущую базу терминов! Вы уверены?',
+      onConfirm: async () => {
+        setImporting(true);
+        try {
+          const text = await file.text();
+          const data = JSON.parse(text);
+          const res = await api.importTerms(profile?.role || '', data);
+          if (res.success) {
+            setAlertMessage({ isOpen: true, title: 'Успех', message: 'База терминов успешно восстановлена!' });
+            loadData();
+          } else {
+            setAlertMessage({ isOpen: true, title: 'Ошибка', message: `Ошибка: ${res.error}` });
+          }
+        } catch (error) {
+          console.error('Import error:', error);
+          setAlertMessage({ isOpen: true, title: 'Ошибка', message: 'Ошибка при импорте. Проверьте формат файла.' });
+        } finally {
+          setImporting(false);
+          e.target.value = '';
+        }
       }
-    } catch (error) {
-      console.error('Import error:', error);
-      alert('Ошибка при импорте. Проверьте формат файла.');
-    } finally {
-      setImporting(false);
-      e.target.value = '';
-    }
+    });
   };
 
   const handleApprove = async (id: string) => {
@@ -124,13 +155,19 @@ export default function AdminPanel() {
   };
 
   const handleReject = async (id: string) => {
-    if (!window.confirm('Вы уверены, что хотите отклонить и удалить этот термин?')) return;
-    try {
-      await api.deleteTerm(id, profile?.role);
-      loadData();
-    } catch (error) {
-      console.error('Error rejecting term:', error);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Отклонение термина',
+      message: 'Вы уверены, что хотите отклонить и удалить этот термин?',
+      onConfirm: async () => {
+        try {
+          await api.deleteTerm(id);
+          loadData();
+        } catch (error) {
+          console.error('Error rejecting term:', error);
+        }
+      }
+    });
   };
 
   const handleSaveSubject = async (e: React.FormEvent) => {
@@ -162,16 +199,28 @@ export default function AdminPanel() {
 
   const handleDeleteSubject = async (id: string) => {
     if (!isSuperAdmin) return;
-    if (!window.confirm('Удалить предмет? Это может повлиять на связанные темы и термины.')) return;
-    await api.deleteSubject(id, profile?.role);
-    loadData();
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Удалить предмет?',
+      message: 'Это может повлиять на связанные темы и термины.',
+      onConfirm: async () => {
+        await api.deleteSubject(id, profile?.role);
+        loadData();
+      }
+    });
   };
 
   const handleDeleteLanguage = async (code: string) => {
     if (!isSuperAdmin) return;
-    if (!window.confirm('Удалить язык?')) return;
-    await api.deleteLanguage(code, profile?.role);
-    loadData();
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Удалить язык?',
+      message: 'Вы действительно хотите удалить этот язык?',
+      onConfirm: async () => {
+        await api.deleteLanguage(code, profile?.role);
+        loadData();
+      }
+    });
   };
 
   if (loading) return <div className="text-center py-20">Загрузка...</div>;
@@ -187,6 +236,38 @@ export default function AdminPanel() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
+      <ConfirmModal
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        isDestructive={confirmDialog.isDestructive}
+      />
+      
+      <AnimatePresence>
+        {alertMessage.isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-4 right-4 z-[200] bg-white border border-stone-200 shadow-xl rounded-2xl p-4 max-w-sm flex items-start gap-3"
+          >
+            <Info className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h4 className="font-bold text-stone-900 text-sm">{alertMessage.title}</h4>
+              <p className="text-stone-600 text-sm mt-1">{alertMessage.message}</p>
+            </div>
+            <button 
+              onClick={() => setAlertMessage(prev => ({ ...prev, isOpen: false }))}
+              className="text-stone-400 hover:text-stone-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <header className="text-center space-y-4">
         <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto border-2 border-emerald-200">
           <Shield className="w-8 h-8" />
@@ -453,18 +534,27 @@ export default function AdminPanel() {
                   </div>
                   
                   {isSuperAdmin && u.id !== profile?.id && (
-                    <div className="pt-4 border-t border-stone-100">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400 block mb-2">Изменить роль</label>
-                      <select 
-                        value={u.role}
-                        onChange={(e) => handleUpdateRole(u.id, e.target.value)}
-                        className="w-full p-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                    <div className="pt-4 border-t border-stone-100 flex flex-col gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400 block mb-2">Изменить роль</label>
+                        <select 
+                          value={u.role}
+                          onChange={(e) => handleUpdateRole(u.id, e.target.value)}
+                          className="w-full p-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                        >
+                          <option value="guest">Гость (Ученик)</option>
+                          <option value="editor">Редактор (Учитель)</option>
+                          <option value="chief_editor">Главный редактор (Админ)</option>
+                          <option value="super_admin">Супер-админ</option>
+                        </select>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteUser(u.id)}
+                        className="w-full flex items-center justify-center gap-2 p-2 bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 rounded-xl text-xs font-bold uppercase tracking-widest transition-all"
                       >
-                        <option value="guest">Гость (Ученик)</option>
-                        <option value="editor">Редактор (Учитель)</option>
-                        <option value="chief_editor">Главный редактор (Админ)</option>
-                        <option value="super_admin">Супер-админ</option>
-                      </select>
+                        <Trash2 className="w-3 h-3" />
+                        Удалить пользователя
+                      </button>
                     </div>
                   )}
                 </div>

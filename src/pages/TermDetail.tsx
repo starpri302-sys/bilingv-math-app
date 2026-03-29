@@ -55,7 +55,7 @@ export default function TermDetail() {
 
   const handleDelete = async () => {
     try {
-      await api.deleteTerm(id!);
+      await api.deleteTerm(id!, profile?.role);
       navigate('/');
     } catch (error) {
       console.error('Error deleting term:', error);

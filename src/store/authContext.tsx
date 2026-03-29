@@ -48,7 +48,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           logout();
         }
       } catch (error) {
-        console.error('Failed to fetch user profile:', error);
         logout();
       }
     }

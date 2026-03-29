@@ -20,21 +20,30 @@ const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret";
 const pglite = new PGlite("./pgdata");
 
 const pool = {
-  query: async (text: string, params?: any[]) => {
+  query: async (text: string, params?: any[]): Promise<{ rows: any[]; rowCount: number }> => {
     const res = await pglite.query(text, params);
     return {
-      rows: res.rows,
+      rows: res.rows as any[],
       rowCount: (res as any).affectedRows ?? res.rows.length,
     };
   },
+  exec: async (text: string) => {
+    await pglite.exec(text);
+  },
   connect: async () => {
     return {
-      query: async (text: string, params?: any[]) => {
+      query: async (text: string, params?: any[]): Promise<{ rows: any[]; rowCount: number }> => {
+        if (text === "BEGIN" || text === "COMMIT" || text === "ROLLBACK") {
+          return { rows: [], rowCount: 0 };
+        }
         const res = await pglite.query(text, params);
         return {
-          rows: res.rows,
+          rows: res.rows as any[],
           rowCount: (res as any).affectedRows ?? res.rows.length,
         };
+      },
+      exec: async (text: string) => {
+        await pglite.exec(text);
       },
       release: () => {},
     };
@@ -57,8 +66,7 @@ async function logAction(userId: string | null, username: string | null, action:
 async function initDb() {
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
-    await client.query(`
+    await client.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         username TEXT UNIQUE,
@@ -164,10 +172,9 @@ async function initDb() {
       await client.query("INSERT INTO subjects (id, slug, name_ru, name_tyv, icon) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING", ["s2", "physics", "Физика", "Физика", "atom"]);
       await client.query("INSERT INTO subjects (id, slug, name_ru, name_tyv, icon) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING", ["s3", "it", "Информатика", "Информатика", "monitor"]);
     }
-    await client.query("COMMIT");
   } catch (error) {
-    await client.query("ROLLBACK");
     console.error("Database initialization failed:", error);
+    fs.writeFileSync("db_error.log", String(error));
     throw error;
   } finally {
     client.release();
@@ -203,7 +210,7 @@ async function startServer() {
     }
   });
 
-  const PORT = parseInt(process.env.PORT || "3000", 10) || 3000;
+  const PORT = 3000;
 
   app.use(cors());
   app.use(express.json({ limit: '50mb' }));
@@ -743,10 +750,8 @@ async function startServer() {
   });
 
   app.post("/api/terms", async (req, res) => {
-    const { id, grade, subject_id, created_by, uid, status, translations, user_role, role } = req.body;
-    const finalUserId = created_by || uid || 'system';
-    const finalUserRole = user_role || role || 'guest';
-    const isModerator = finalUserRole === 'chief_editor' || finalUserRole === 'super_admin';
+    const { id, grade, subject_id, status, translations, user_role, user_id } = req.body;
+    const isModerator = user_role === 'chief_editor' || user_role === 'super_admin';
     const finalStatus = isModerator ? (status || 'published') : 'pending';
 
     const client = await pool.connect();
@@ -755,7 +760,7 @@ async function startServer() {
       await client.query(`
         INSERT INTO terms (id, grade, subject_id, created_by, status)
         VALUES ($1, $2, $3, $4, $5)
-      `, [id, grade, subject_id, finalUserId, finalStatus]);
+      `, [id, grade, subject_id, user_id || 'system', finalStatus]);
       
       for (const [langCode, tData] of Object.entries(translations) as [string, any][]) {
         await client.query(`
@@ -783,14 +788,8 @@ async function startServer() {
   });
 
   app.put("/api/terms/:id", async (req, res) => {
-    const { grade, subject_id, status, translations, user_id, uid, username, user_role, role } = req.body;
+    const { grade, subject_id, status, translations, user_id, username, user_role } = req.body;
     const termId = req.params.id;
-    const finalUserId = user_id || uid || 'system';
-    const finalUserRole = user_role || role || 'guest';
-
-    if (finalUserRole === 'guest') {
-      return res.status(403).json({ error: "Forbidden" });
-    }
 
     const client = await pool.connect();
     try {
@@ -806,12 +805,12 @@ async function startServer() {
       `, [
         Math.random().toString(36).substr(2, 9),
         termId,
-        finalUserId,
+        user_id || 'system',
         username || 'System',
         JSON.stringify({ term: currentTerm, translations: currentTransRes.rows })
       ]);
 
-      const isModerator = finalUserRole === 'chief_editor' || finalUserRole === 'super_admin';
+      const isModerator = user_role === 'chief_editor' || user_role === 'super_admin';
       const finalStatus = isModerator ? (status || 'published') : 'pending';
       
       await client.query(`
@@ -827,7 +826,7 @@ async function startServer() {
         `, [termId, langCode, tData.name, tData.definition, tData.example, tData.additional]);
       }
 
-      if (currentTerm && currentTerm.created_by !== finalUserId) {
+      if (currentTerm && currentTerm.created_by !== user_id) {
         const termName = (translations as any).ru?.name || (translations as any).tyv?.name || 'Статья';
         await createNotification(currentTerm.created_by, 'term_edited', termId, `Ваша статья "${termName}" была отредактирована модератором.`);
       }
@@ -836,7 +835,7 @@ async function startServer() {
         const adminsRes = await client.query("SELECT id FROM users WHERE role IN ('chief_editor', 'super_admin')");
         const termName = (translations as any).ru?.name || (translations as any).tyv?.name || 'Статья';
         for (const admin of adminsRes.rows) {
-          if (admin.id !== finalUserId) {
+          if (admin.id !== user_id) {
             await createNotification(admin.id, 'term_pending', termId, `Статья "${termName}" требует повторной проверки.`);
           }
         }
@@ -854,11 +853,10 @@ async function startServer() {
   });
 
   app.patch("/api/terms/:id", async (req, res) => {
-    const { status, user_role, role } = req.body;
+    const { status, user_role } = req.body;
     const termId = req.params.id;
-    const finalUserRole = user_role || role;
 
-    if (finalUserRole !== 'chief_editor' && finalUserRole !== 'super_admin') {
+    if (user_role !== 'chief_editor' && user_role !== 'super_admin') {
       return res.status(403).json({ error: "Forbidden" });
     }
 
@@ -883,10 +881,8 @@ async function startServer() {
   });
 
   app.delete("/api/terms/:id", async (req, res) => {
-    const { user_role } = req.query;
-    if (user_role !== 'chief_editor' && user_role !== 'super_admin') {
-      return res.status(403).json({ error: "Forbidden" });
-    }
+    const userRole = req.query.user_role as string;
+    
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
