@@ -7,6 +7,7 @@ import { createServer as createViteServer } from "vite";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
+import { Pool } from "pg";
 import Database from "better-sqlite3";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -16,56 +17,68 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret";
+const DATABASE_URL = process.env.DATABASE_URL;
 
-const db = new Database("./sqlite.db");
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+let pool: any;
 
-function convertSql(text: string) {
-  return text.replace(/\$\d+/g, '?');
-}
+if (DATABASE_URL) {
+  // Use real PostgreSQL
+  pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+  });
+} else {
+  // Use SQLite fallback (for AI Studio or local dev without PG)
+  const db = new Database("./sqlite.db");
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
 
-const pool = {
-  query: async (text: string, params?: any[]): Promise<{ rows: any[]; rowCount: number }> => {
-    const sql = convertSql(text);
-    if (sql.trim().toUpperCase().startsWith("SELECT") || sql.trim().toUpperCase().startsWith("PRAGMA")) {
-      const stmt = db.prepare(sql);
-      const rows = stmt.all(...(params || []));
-      return { rows, rowCount: rows.length };
-    } else {
-      const stmt = db.prepare(sql);
-      const info = stmt.run(...(params || []));
-      return { rows: [], rowCount: info.changes };
-    }
-  },
-  exec: async (text: string) => {
-    db.exec(text);
-  },
-  connect: async () => {
-    return {
-      query: async (text: string, params?: any[]): Promise<{ rows: any[]; rowCount: number }> => {
-        if (text === "BEGIN" || text === "COMMIT" || text === "ROLLBACK") {
+  function convertSql(text: string) {
+    return text.replace(/\$\d+/g, '?');
+  }
+
+  pool = {
+    query: async (text: string, params?: any[]): Promise<{ rows: any[]; rowCount: number }> => {
+      const sql = convertSql(text);
+      if (sql.trim().toUpperCase().startsWith("SELECT") || sql.trim().toUpperCase().startsWith("PRAGMA")) {
+        const stmt = db.prepare(sql);
+        const rows = stmt.all(...(params || []));
+        return { rows, rowCount: rows.length };
+      } else {
+        const stmt = db.prepare(sql);
+        const info = stmt.run(...(params || []));
+        return { rows: [], rowCount: info.changes };
+      }
+    },
+    exec: async (text: string) => {
+      db.exec(text);
+    },
+    connect: async () => {
+      return {
+        query: async (text: string, params?: any[]): Promise<{ rows: any[]; rowCount: number }> => {
+          if (text === "BEGIN" || text === "COMMIT" || text === "ROLLBACK") {
+            db.exec(text);
+            return { rows: [], rowCount: 0 };
+          }
+          const sql = convertSql(text);
+          if (sql.trim().toUpperCase().startsWith("SELECT") || sql.trim().toUpperCase().startsWith("PRAGMA")) {
+            const stmt = db.prepare(sql);
+            const rows = stmt.all(...(params || []));
+            return { rows, rowCount: rows.length };
+          } else {
+            const stmt = db.prepare(sql);
+            const info = stmt.run(...(params || []));
+            return { rows: [], rowCount: info.changes };
+          }
+        },
+        exec: async (text: string) => {
           db.exec(text);
-          return { rows: [], rowCount: 0 };
-        }
-        const sql = convertSql(text);
-        if (sql.trim().toUpperCase().startsWith("SELECT") || sql.trim().toUpperCase().startsWith("PRAGMA")) {
-          const stmt = db.prepare(sql);
-          const rows = stmt.all(...(params || []));
-          return { rows, rowCount: rows.length };
-        } else {
-          const stmt = db.prepare(sql);
-          const info = stmt.run(...(params || []));
-          return { rows: [], rowCount: info.changes };
-        }
-      },
-      exec: async (text: string) => {
-        db.exec(text);
-      },
-      release: () => {},
-    };
-  },
-};
+        },
+        release: () => {},
+      };
+    },
+  };
+}
 
 async function logAction(userId: string | null, username: string | null, action: string, details: any) {
   try {
