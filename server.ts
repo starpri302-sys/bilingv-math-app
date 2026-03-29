@@ -23,10 +23,22 @@ let pool: any;
 
 if (DATABASE_URL) {
   // Use real PostgreSQL
-  pool = new Pool({
+  const pgPool = new Pool({
     connectionString: DATABASE_URL,
     ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
   });
+
+  pool = {
+    query: (text: string, params?: any[]) => pgPool.query(text, params),
+    connect: async () => {
+      const client = await pgPool.connect();
+      return {
+        query: (text: string, params?: any[]) => client.query(text, params),
+        exec: (text: string) => client.query(text),
+        release: () => client.release(),
+      };
+    },
+  };
 } else {
   // Use SQLite fallback (for AI Studio or local dev without PG)
   const db = new Database("./sqlite.db");
