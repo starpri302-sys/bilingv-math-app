@@ -7,7 +7,7 @@ import { createServer as createViteServer } from "vite";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
-import { PGlite } from "@electric-sql/pglite";
+import Database from "better-sqlite3";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
@@ -17,33 +17,50 @@ dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret";
 
-const pglite = new PGlite("./pgdata");
+const db = new Database("./sqlite.db");
+db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
+
+function convertSql(text: string) {
+  return text.replace(/\$\d+/g, '?');
+}
 
 const pool = {
   query: async (text: string, params?: any[]): Promise<{ rows: any[]; rowCount: number }> => {
-    const res = await pglite.query(text, params);
-    return {
-      rows: res.rows as any[],
-      rowCount: (res as any).affectedRows ?? res.rows.length,
-    };
+    const sql = convertSql(text);
+    if (sql.trim().toUpperCase().startsWith("SELECT") || sql.trim().toUpperCase().startsWith("PRAGMA")) {
+      const stmt = db.prepare(sql);
+      const rows = stmt.all(...(params || []));
+      return { rows, rowCount: rows.length };
+    } else {
+      const stmt = db.prepare(sql);
+      const info = stmt.run(...(params || []));
+      return { rows: [], rowCount: info.changes };
+    }
   },
   exec: async (text: string) => {
-    await pglite.exec(text);
+    db.exec(text);
   },
   connect: async () => {
     return {
       query: async (text: string, params?: any[]): Promise<{ rows: any[]; rowCount: number }> => {
         if (text === "BEGIN" || text === "COMMIT" || text === "ROLLBACK") {
+          db.exec(text);
           return { rows: [], rowCount: 0 };
         }
-        const res = await pglite.query(text, params);
-        return {
-          rows: res.rows as any[],
-          rowCount: (res as any).affectedRows ?? res.rows.length,
-        };
+        const sql = convertSql(text);
+        if (sql.trim().toUpperCase().startsWith("SELECT") || sql.trim().toUpperCase().startsWith("PRAGMA")) {
+          const stmt = db.prepare(sql);
+          const rows = stmt.all(...(params || []));
+          return { rows, rowCount: rows.length };
+        } else {
+          const stmt = db.prepare(sql);
+          const info = stmt.run(...(params || []));
+          return { rows: [], rowCount: info.changes };
+        }
       },
       exec: async (text: string) => {
-        await pglite.exec(text);
+        db.exec(text);
       },
       release: () => {},
     };
