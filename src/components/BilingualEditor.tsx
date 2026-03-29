@@ -110,7 +110,7 @@ export default function BilingualEditor({ onClose, initialData }: BilingualEdito
         await api.createTerm({
           ...formData,
           id: Math.random().toString(36).substr(2, 9),
-          created_by: user.uid,
+          user_id: user.uid,
           status: newStatus
         }, profile?.role);
       }

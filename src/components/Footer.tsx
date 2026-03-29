@@ -25,8 +25,8 @@ export default function Footer() {
           <div className="space-y-4">
             <h4 className="font-bold text-stone-900 uppercase tracking-widest text-xs">Правовая информация</h4>
             <ul className="space-y-2 text-sm">
-              <li><a href="#" className="text-stone-500 hover:text-emerald-600 transition-colors">Политика конфиденциальности</a></li>
-              <li><a href="#" className="text-stone-500 hover:text-emerald-600 transition-colors">Пользовательское соглашение</a></li>
+              <li><Link to="/privacy" className="text-stone-500 hover:text-emerald-600 transition-colors">Политика конфиденциальности</Link></li>
+              <li><Link to="/terms" className="text-stone-500 hover:text-emerald-600 transition-colors">Пользовательское соглашение</Link></li>
               <li><span className="text-stone-400">Соответствие ФЗ-152 РФ</span></li>
             </ul>
           </div>

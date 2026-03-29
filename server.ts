@@ -97,6 +97,10 @@ async function initDb() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      INSERT INTO users (id, username, email, role, full_name) 
+      VALUES ('system', 'system', 'system@system.com', 'super_admin', 'System')
+      ON CONFLICT DO NOTHING;
+
       CREATE TABLE IF NOT EXISTS subjects (
         id TEXT PRIMARY KEY,
         slug TEXT UNIQUE,
@@ -767,9 +771,10 @@ async function startServer() {
   });
 
   app.post("/api/terms", async (req, res) => {
-    const { id, grade, subject_id, status, translations, user_role, user_id } = req.body;
+    const { id, grade, subject_id, status, translations, user_role, user_id, created_by } = req.body;
     const isModerator = user_role === 'chief_editor' || user_role === 'super_admin';
     const finalStatus = isModerator ? (status || 'published') : 'pending';
+    const creatorId = user_id || created_by || 'system';
 
     const client = await pool.connect();
     try {
@@ -777,7 +782,7 @@ async function startServer() {
       await client.query(`
         INSERT INTO terms (id, grade, subject_id, created_by, status)
         VALUES ($1, $2, $3, $4, $5)
-      `, [id, grade, subject_id, user_id || 'system', finalStatus]);
+      `, [id, grade, subject_id, creatorId, finalStatus]);
       
       for (const [langCode, tData] of Object.entries(translations) as [string, any][]) {
         await client.query(`
@@ -805,8 +810,9 @@ async function startServer() {
   });
 
   app.put("/api/terms/:id", async (req, res) => {
-    const { grade, subject_id, status, translations, user_id, username, user_role } = req.body;
+    const { grade, subject_id, status, translations, user_id, created_by, username, user_role } = req.body;
     const termId = req.params.id;
+    const editorId = user_id || created_by || 'system';
 
     const client = await pool.connect();
     try {
@@ -822,7 +828,7 @@ async function startServer() {
       `, [
         Math.random().toString(36).substr(2, 9),
         termId,
-        user_id || 'system',
+        editorId,
         username || 'System',
         JSON.stringify({ term: currentTerm, translations: currentTransRes.rows })
       ]);
@@ -843,7 +849,7 @@ async function startServer() {
         `, [termId, langCode, tData.name, tData.definition, tData.example, tData.additional]);
       }
 
-      if (currentTerm && currentTerm.created_by !== user_id) {
+      if (currentTerm && currentTerm.created_by !== editorId) {
         const termName = (translations as any).ru?.name || (translations as any).tyv?.name || 'Статья';
         await createNotification(currentTerm.created_by, 'term_edited', termId, `Ваша статья "${termName}" была отредактирована модератором.`);
       }
