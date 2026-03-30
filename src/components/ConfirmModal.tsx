@@ -39,12 +39,12 @@ export default function ConfirmModal({
           exit={{ scale: 0.9, y: 20 }}
           className="bg-white w-full max-w-md overflow-hidden rounded-3xl shadow-2xl flex flex-col"
         >
-          <header className="p-6 border-b border-stone-100 flex justify-between items-center bg-stone-50">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center border ${isDestructive ? 'bg-red-100 text-red-600 border-red-200' : 'bg-emerald-100 text-emerald-600 border-emerald-200'}`}>
+          <header className="p-6 border-b border-stone-100 flex justify-between items-start bg-stone-50">
+            <div className="flex items-start gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center border shrink-0 ${isDestructive ? 'bg-red-100 text-red-600 border-red-200' : 'bg-emerald-100 text-emerald-600 border-emerald-200'}`}>
                 <AlertTriangle className="w-5 h-5" />
               </div>
-              <h2 className="text-xl font-serif font-black text-stone-900 leading-tight">
+              <h2 className="text-xl font-serif font-black text-stone-900 leading-tight break-words">
                 {title}
               </h2>
             </div>

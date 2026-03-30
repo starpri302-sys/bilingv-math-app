@@ -312,16 +312,16 @@ export default function AdminPanel() {
                     exit={{ opacity: 0, scale: 0.95 }}
                     className="bg-white p-6 sm:p-8 rounded-3xl border border-stone-200 shadow-sm hover:shadow-md transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6"
                   >
-                    <div className="space-y-2 flex-1">
+                    <div className="space-y-2 flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="px-2 py-0.5 bg-stone-100 text-stone-600 rounded text-[10px] font-bold uppercase tracking-widest border border-stone-200">
                           Класс {term.grade}
                         </span>
                       </div>
-                      <h3 className="text-2xl font-serif font-bold text-stone-900">
+                      <h3 className="text-2xl font-serif font-bold text-stone-900 break-words">
                         {term.translations?.map((t: any) => t.name).join(' / ')}
                       </h3>
-                      <p className="text-stone-500 text-sm line-clamp-2 italic">
+                      <p className="text-stone-500 text-sm line-clamp-3 italic break-words">
                         {term.translations?.[0]?.definition?.replace(/<[^>]*>/g, '')}
                       </p>
                     </div>
