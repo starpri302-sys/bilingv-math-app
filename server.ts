@@ -33,12 +33,13 @@ async function logAction(userId: string | null, username: string | null, action:
 
 // Initialize database schema
 async function initDb(forceReinstall = false) {
+  console.log(`Initializing database (forceReinstall: ${forceReinstall})...`);
   const client = await pool.connect();
   try {
     if (forceReinstall) {
       console.log("!!! FORCE REINSTALL: Dropping all tables...");
       const tables = [
-        'comments', 'term_versions', 'notifications', 'logs', 
+        'notifications', 'comments', 'term_versions', 'logs', 
         'password_resets', 'term_translations', 'terms', 
         'languages', 'subjects', 'users'
       ];
@@ -46,13 +47,15 @@ async function initDb(forceReinstall = false) {
       for (const table of tables) {
         try {
           await client.exec(`DROP TABLE IF EXISTS ${table} CASCADE`);
+          console.log(`Dropped table: ${table}`);
         } catch (e) {
-          // Fallback for SQLite which doesn't support CASCADE
           await client.exec(`DROP TABLE IF EXISTS ${table}`);
+          console.log(`Dropped table (no cascade): ${table}`);
         }
       }
-      console.log("Tables dropped.");
     }
+
+    console.log("Creating tables...");
 
     await client.exec(`
       CREATE TABLE IF NOT EXISTS users (
@@ -67,18 +70,22 @@ async function initDb(forceReinstall = false) {
         avatar TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+    console.log("Table 'users' ready.");
 
+    await client.query(`
       INSERT INTO users (id, username, email, role, full_name) 
       VALUES ('system', 'system', 'system@system.com', 'super_admin', 'System')
-      ON CONFLICT DO NOTHING;
+      ON CONFLICT (id) DO NOTHING
     `);
 
     const adminPassword = await bcrypt.hash("admin123", 10);
     await client.query(`
       INSERT INTO users (id, username, email, role, full_name, password) 
       VALUES ($1, $2, $3, $4, $5, $6)
-      ON CONFLICT DO NOTHING
+      ON CONFLICT (id) DO NOTHING
     `, ['admin', 'admin', 'starpri302@gmail.com', 'super_admin', 'Admin', adminPassword]);
+    console.log("Default users ready.");
 
     await client.exec(`
       CREATE TABLE IF NOT EXISTS subjects (
@@ -159,19 +166,22 @@ async function initDb(forceReinstall = false) {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    console.log("All tables created successfully.");
 
     // Seed initial subjects and languages if empty
     const langCountRes = await client.query("SELECT COUNT(*) as count FROM languages");
     if (parseInt(langCountRes.rows[0].count) === 0) {
-      await client.query("INSERT INTO languages (code, name, native_name, flag) VALUES ($1, $2, $3, $4)", ["ru", "Русский", "Русский", "🇷🇺"]);
-      await client.query("INSERT INTO languages (code, name, native_name, flag) VALUES ($1, $2, $3, $4)", ["tyv", "Тувинский", "Тыва дыл", "🇹🇻"]);
+      await client.query("INSERT INTO languages (code, name, native_name, flag) VALUES ($1, $2, $3, $4) ON CONFLICT (code) DO NOTHING", ["ru", "Русский", "Русский", "🇷🇺"]);
+      await client.query("INSERT INTO languages (code, name, native_name, flag) VALUES ($1, $2, $3, $4) ON CONFLICT (code) DO NOTHING", ["tyv", "Тувинский", "Тыва дыл", "🇹🇻"]);
+      console.log("Languages seeded.");
     }
 
     const subjectCountRes = await client.query("SELECT COUNT(*) as count FROM subjects");
     if (parseInt(subjectCountRes.rows[0].count) === 0) {
-      await client.query("INSERT INTO subjects (id, slug, name_ru, name_tyv, icon) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING", ["s1", "math", "Математика", "Математика", "calculator"]);
-      await client.query("INSERT INTO subjects (id, slug, name_ru, name_tyv, icon) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING", ["s2", "physics", "Физика", "Физика", "atom"]);
-      await client.query("INSERT INTO subjects (id, slug, name_ru, name_tyv, icon) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING", ["s3", "it", "Информатика", "Информатика", "monitor"]);
+      await client.query("INSERT INTO subjects (id, slug, name_ru, name_tyv, icon) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING", ["s1", "math", "Математика", "Математика", "calculator"]);
+      await client.query("INSERT INTO subjects (id, slug, name_ru, name_tyv, icon) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING", ["s2", "physics", "Физика", "Физика", "atom"]);
+      await client.query("INSERT INTO subjects (id, slug, name_ru, name_tyv, icon) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING", ["s3", "it", "Информатика", "Информатика", "monitor"]);
+      console.log("Subjects seeded.");
     }
   } catch (error) {
     console.error("Database initialization failed:", error);
