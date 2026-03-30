@@ -7,90 +7,17 @@ import { createServer as createViteServer } from "vite";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
-import { Pool } from "pg";
-import Database from "better-sqlite3";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
+import pool from "./db";
 
 dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret";
-const DATABASE_URL = process.env.DATABASE_URL;
-
-let pool: any;
-
-if (DATABASE_URL) {
-  // Use real PostgreSQL
-  const pgPool = new Pool({
-    connectionString: DATABASE_URL,
-    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
-  });
-
-  pool = {
-    query: (text: string, params?: any[]) => pgPool.query(text, params),
-    connect: async () => {
-      const client = await pgPool.connect();
-      return {
-        query: (text: string, params?: any[]) => client.query(text, params),
-        exec: (text: string) => client.query(text),
-        release: () => client.release(),
-      };
-    },
-  };
-} else {
-  // Use SQLite fallback (for AI Studio or local dev without PG)
-  const db = new Database("./sqlite.db");
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-
-  function convertSql(text: string) {
-    return text.replace(/\$\d+/g, '?');
-  }
-
-  pool = {
-    query: async (text: string, params?: any[]): Promise<{ rows: any[]; rowCount: number }> => {
-      const sql = convertSql(text);
-      if (sql.trim().toUpperCase().startsWith("SELECT") || sql.trim().toUpperCase().startsWith("PRAGMA")) {
-        const stmt = db.prepare(sql);
-        const rows = stmt.all(...(params || []));
-        return { rows, rowCount: rows.length };
-      } else {
-        const stmt = db.prepare(sql);
-        const info = stmt.run(...(params || []));
-        return { rows: [], rowCount: info.changes };
-      }
-    },
-    exec: async (text: string) => {
-      db.exec(text);
-    },
-    connect: async () => {
-      return {
-        query: async (text: string, params?: any[]): Promise<{ rows: any[]; rowCount: number }> => {
-          if (text === "BEGIN" || text === "COMMIT" || text === "ROLLBACK") {
-            db.exec(text);
-            return { rows: [], rowCount: 0 };
-          }
-          const sql = convertSql(text);
-          if (sql.trim().toUpperCase().startsWith("SELECT") || sql.trim().toUpperCase().startsWith("PRAGMA")) {
-            const stmt = db.prepare(sql);
-            const rows = stmt.all(...(params || []));
-            return { rows, rowCount: rows.length };
-          } else {
-            const stmt = db.prepare(sql);
-            const info = stmt.run(...(params || []));
-            return { rows: [], rowCount: info.changes };
-          }
-        },
-        exec: async (text: string) => {
-          db.exec(text);
-        },
-        release: () => {},
-      };
-    },
-  };
-}
+const PORT = parseInt(process.env.PORT || "3000", 10);
+const finalPort = isNaN(PORT) || PORT <= 0 || PORT > 65535 ? 3000 : PORT;
 
 async function logAction(userId: string | null, username: string | null, action: string, details: any) {
   try {
@@ -105,9 +32,28 @@ async function logAction(userId: string | null, username: string | null, action:
 }
 
 // Initialize database schema
-async function initDb() {
+async function initDb(forceReinstall = false) {
   const client = await pool.connect();
   try {
+    if (forceReinstall) {
+      console.log("!!! FORCE REINSTALL: Dropping all tables...");
+      const tables = [
+        'comments', 'term_versions', 'notifications', 'logs', 
+        'password_resets', 'term_translations', 'terms', 
+        'languages', 'subjects', 'users'
+      ];
+      
+      for (const table of tables) {
+        try {
+          await client.exec(`DROP TABLE IF EXISTS ${table} CASCADE`);
+        } catch (e) {
+          // Fallback for SQLite which doesn't support CASCADE
+          await client.exec(`DROP TABLE IF EXISTS ${table}`);
+        }
+      }
+      console.log("Tables dropped.");
+    }
+
     await client.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
@@ -125,7 +71,16 @@ async function initDb() {
       INSERT INTO users (id, username, email, role, full_name) 
       VALUES ('system', 'system', 'system@system.com', 'super_admin', 'System')
       ON CONFLICT DO NOTHING;
+    `);
 
+    const adminPassword = await bcrypt.hash("admin123", 10);
+    await client.query(`
+      INSERT INTO users (id, username, email, role, full_name, password) 
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT DO NOTHING
+    `, ['admin', 'admin', 'starpri302@gmail.com', 'super_admin', 'Admin', adminPassword]);
+
+    await client.exec(`
       CREATE TABLE IF NOT EXISTS subjects (
         id TEXT PRIMARY KEY,
         slug TEXT UNIQUE,
@@ -230,7 +185,13 @@ async function initDb() {
 async function startServer() {
   console.log("Starting server...");
   try {
-    await initDb();
+    // Test database connectivity
+    await pool.testConnection();
+    console.log("Database connection successful.");
+    
+    // Check for a flag to reinstall. In this environment, we'll do it once if requested.
+    const forceReinstall = process.env.REINSTALL === "true";
+    await initDb(forceReinstall);
     console.log("Database initialized successfully.");
   } catch (error) {
     console.error("Database initialization failed. The app may not function correctly:", error);
@@ -256,8 +217,6 @@ async function startServer() {
     }
   });
 
-  const PORT = 3000;
-
   app.use(cors());
   app.use(express.json({ limit: '50mb' }));
   app.use((err: any, req: any, res: any, next: any) => {
@@ -268,6 +227,19 @@ async function startServer() {
     next();
   });
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+  // Global error handler
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error('Unhandled Error:', err);
+    if (res.headersSent) {
+      return next(err);
+    }
+    res.status(500).json({ 
+      error: "Internal server error", 
+      message: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+  });
 
   // Rate limiting
   const limiter = rateLimit({
@@ -1034,10 +1006,10 @@ async function startServer() {
     });
   }
 
-  httpServer.listen(PORT, "0.0.0.0", () => {
-    console.log(`>>> Server is listening on port ${PORT}`);
+  httpServer.listen(finalPort, "0.0.0.0", () => {
+    console.log(`>>> Server is listening on port ${finalPort}`);
     console.log(`>>> Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`>>> Local URL: http://localhost:${PORT}`);
+    console.log(`>>> Local URL: http://localhost:${finalPort}`);
   });
 }
 
