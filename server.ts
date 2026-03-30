@@ -254,7 +254,7 @@ async function startServer() {
   // Rate limiting
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
+    max: 1000, // Increased from 100 to 1000 to avoid blocking active users
     standardHeaders: true,
     legacyHeaders: false,
     validate: false,
@@ -266,7 +266,7 @@ async function startServer() {
 
   const authLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 10, // Limit each IP to 10 login/forgot-password attempts per hour
+    max: 100, // Increased from 10 to 100
     standardHeaders: true,
     legacyHeaders: false,
     validate: false,
@@ -407,17 +407,22 @@ async function startServer() {
       const decoded = jwt.verify(authToken, JWT_SECRET) as any;
       const { currentPassword, newPassword } = req.body;
       
-      const userRes = await pool.query("SELECT * FROM users WHERE id = $1", [decoded.id]);
-      const user = userRes.rows[0];
-      if (!user || !(await bcrypt.compare(currentPassword, user.password))) {
-        return res.status(401).json({ error: "Invalid current password" });
-      }
+      try {
+        const userRes = await pool.query("SELECT * FROM users WHERE id = $1", [decoded.id]);
+        const user = userRes.rows[0];
+        if (!user || !(await bcrypt.compare(currentPassword, user.password))) {
+          return res.status(401).json({ error: "Invalid current password" });
+        }
 
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
-      await pool.query("UPDATE users SET password = $1 WHERE id = $2", [hashedPassword, decoded.id]);
-      
-      res.json({ success: true });
-    } catch (error) {
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await pool.query("UPDATE users SET password = $1 WHERE id = $2", [hashedPassword, decoded.id]);
+        
+        res.json({ success: true });
+      } catch (dbError: any) {
+        console.error("Database error in password change:", dbError);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    } catch (jwtError) {
       res.status(401).json({ error: "Invalid token" });
     }
   });
@@ -767,7 +772,9 @@ async function startServer() {
       const termsRes = await pool.query(query, params);
       const terms = termsRes.rows;
       
-      const termsWithTranslations = await Promise.all(terms.map(async (term) => {
+      // Optimization: Fetch all translations in one query if possible, 
+      // but for now let's just keep it simple and add a limit to avoid overload
+      const termsWithTranslations = await Promise.all(terms.slice(0, 100).map(async (term) => {
         const transRes = await pool.query("SELECT * FROM term_translations WHERE term_id = $1", [term.id]);
         return { ...term, translations: transRes.rows };
       }));
@@ -908,7 +915,10 @@ async function startServer() {
     const { status, user_role } = req.body;
     const termId = req.params.id;
 
+    console.log(`[Term Status Update] ID: ${termId}, New Status: ${status}, By Role: ${user_role}`);
+
     if (user_role !== 'chief_editor' && user_role !== 'super_admin') {
+      console.warn(`[Term Status Update] Unauthorized attempt by role: ${user_role}`);
       return res.status(403).json({ error: "Forbidden" });
     }
 
@@ -921,13 +931,15 @@ async function startServer() {
         const termName = transRes.rows[0]?.name || 'Статья';
         
         if (termRes.rows[0]?.created_by) {
+          console.log(`[Notification] Creating 'term_approved' for user ${termRes.rows[0].created_by}`);
           await createNotification(termRes.rows[0].created_by, 'term_approved', termId, `Ваша статья "${termName}" была одобрена и опубликована.`);
         }
       }
       
+      await logAction(null, 'System', 'update_term_status', { termId, status, user_role });
       res.json({ success: true });
     } catch (error) {
-      console.error('Term status update error:', error);
+      console.error('[Term Status Update] Failed:', error);
       res.status(500).json({ error: "Failed to update term status" });
     }
   });

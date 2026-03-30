@@ -44,11 +44,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (userData && !userData.error) {
           setUser(userData);
           setProfile(userData);
-        } else {
+        } else if (userData && userData.error) {
+          // If the server returned a specific error object, check if it's auth related
+          if (userData.error.includes('token') || userData.error.includes('Unauthorized')) {
+            logout();
+          }
+        }
+      } catch (error: any) {
+        console.error('Profile refresh failed:', error);
+        // Only logout if it's a clear authentication error (401/403)
+        // We check the error message thrown by handleResponse
+        const msg = error.message?.toLowerCase() || '';
+        if (msg.includes('401') || msg.includes('unauthorized') || msg.includes('token') || msg.includes('forbidden')) {
           logout();
         }
-      } catch (error) {
-        logout();
       }
     }
     setLoading(false);

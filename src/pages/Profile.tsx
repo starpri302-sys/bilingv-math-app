@@ -111,7 +111,7 @@ export default function Profile() {
     setPasswordSaving(true);
     setPasswordMessage('');
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       if (!token) throw new Error('No token');
       
       const res = await api.changePassword(token, {
@@ -126,9 +126,9 @@ export default function Profile() {
       } else {
         setPasswordMessage(`Ошибка: ${res.error || 'Не удалось сменить пароль'}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error changing password:', error);
-      setPasswordMessage('Ошибка при смене пароля.');
+      setPasswordMessage(`Ошибка: ${error.message || 'Не удалось сменить пароль'}`);
     } finally {
       setPasswordSaving(false);
     }
