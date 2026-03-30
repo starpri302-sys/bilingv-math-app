@@ -293,7 +293,7 @@ async function startServer() {
       const hashedPassword = await bcrypt.hash(randomPassword, 10);
       
       const id = Math.random().toString(36).substr(2, 9);
-      const userCountRes = await pool.query("SELECT COUNT(*) as count FROM users");
+      const userCountRes = await pool.query("SELECT COUNT(*) as count FROM users WHERE id NOT IN ('system', 'admin')");
       const role = parseInt(userCountRes.rows[0].count) === 0 ? 'super_admin' : 'guest';
       
       await pool.query(`
