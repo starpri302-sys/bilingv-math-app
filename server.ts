@@ -18,15 +18,44 @@ dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret";
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.example.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: process.env.SMTP_SECURE === 'true',
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+const createTransporter = (port: number, secure: boolean) => {
+  const t = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.mail.ru',
+    port: port,
+    secure: secure,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
+  } as any);
+  (t as any).options.family = 4;
+  return t;
+};
+
+const primaryTransporter = createTransporter(
+  parseInt(process.env.SMTP_PORT || '465'), 
+  process.env.SMTP_SECURE !== 'false'
+);
+
+const fallbackTransporter = createTransporter(587, false);
+
+async function sendEmailWithFallback(mailOptions: any) {
+  try {
+    console.log(`Attempting to send email via primary port...`);
+    return await primaryTransporter.sendMail(mailOptions);
+  } catch (error: any) {
+    console.warn(`Primary SMTP failed (Port ${process.env.SMTP_PORT || 465}): ${error.message}. Trying fallback port 587...`);
+    try {
+      return await fallbackTransporter.sendMail(mailOptions);
+    } catch (fallbackError: any) {
+      console.error(`Fallback SMTP also failed: ${fallbackError.message}`);
+      throw fallbackError;
+    }
+  }
+}
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const finalPort = isNaN(PORT) || PORT <= 0 || PORT > 65535 ? 3000 : PORT;
 
@@ -402,8 +431,7 @@ async function startServer() {
 
       if (process.env.SMTP_USER && process.env.SMTP_PASS) {
         try {
-          // Set a timeout for mail sending
-          const mailPromise = transporter.sendMail({
+          const mailOptions = {
             from: process.env.SMTP_FROM || '"Bilingual Math" <taskforcedefy12@mail.ru>',
             to: email,
             subject: "Сброс пароля - Bilingual Math",
@@ -422,13 +450,9 @@ async function startServer() {
                 <p style="font-size: 0.8em; color: #999; text-align: center;">Эта ссылка действительна в течение 1 часа.</p>
               </div>
             `,
-          });
+          };
 
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('SMTP Timeout')), 10000)
-          );
-
-          await Promise.race([mailPromise, timeoutPromise]);
+          await sendEmailWithFallback(mailOptions);
           
           console.log(`Email successfully sent to ${email}`);
           return res.json({ success: true, message: "Инструкции по сбросу пароля отправлены на ваш email" });
