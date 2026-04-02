@@ -378,9 +378,13 @@ async function startServer() {
 
   app.post("/api/auth/forgot-password", async (req, res) => {
     const { email } = req.body;
+    console.log(`Forgot password request for: ${email}`);
     try {
       const userRes = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
-      if (userRes.rowCount === 0) return res.status(404).json({ error: "User not found" });
+      if (userRes.rowCount === 0) {
+        console.log(`User not found: ${email}`);
+        return res.status(404).json({ error: "Пользователь с таким email не найден" });
+      }
 
       const token = Math.random().toString(36).substr(2, 12);
       const expires = new Date(Date.now() + 3600000).toISOString();
@@ -398,33 +402,52 @@ async function startServer() {
 
       if (process.env.SMTP_USER && process.env.SMTP_PASS) {
         try {
-          await transporter.sendMail({
-            from: process.env.SMTP_FROM || '"Bilingual Math" <no-reply@example.com>',
+          // Set a timeout for mail sending
+          const mailPromise = transporter.sendMail({
+            from: process.env.SMTP_FROM || '"Bilingual Math" <taskforcedefy12@mail.ru>',
             to: email,
             subject: "Сброс пароля - Bilingual Math",
             html: `
-              <div style="font-family: sans-serif; padding: 20px; color: #333;">
-                <h2>Сброс пароля</h2>
-                <p>Вы получили это письмо, потому что вы (или кто-то другой) запросили сброс пароля для вашего аккаунта.</p>
-                <p>Пожалуйста, перейдите по ссылке ниже, чтобы завершить процесс:</p>
-                <a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; background-color: #10b981; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Сбросить пароль</a>
-                <p>Если вы не запрашивали сброс, просто проигнорируйте это письмо.</p>
-                <hr />
-                <p style="font-size: 0.8em; color: #666;">Эта ссылка действительна в течение 1 часа.</p>
+              <div style="font-family: sans-serif; padding: 20px; color: #333; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 10px;">
+                <h2 style="color: #10b981;">Сброс пароля</h2>
+                <p>Вы получили это письмо, потому что вы (или кто-то другой) запросили сброс пароля для вашего аккаунта на сайте <b>Bilingual Math</b>.</p>
+                <p>Пожалуйста, нажмите на кнопку ниже, чтобы установить новый пароль:</p>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${resetUrl}" style="display: inline-block; padding: 12px 24px; background-color: #10b981; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">Сбросить пароль</a>
+                </div>
+                <p>Если кнопка не работает, скопируйте и вставьте эту ссылку в браузер:</p>
+                <p style="word-break: break-all; color: #666; font-size: 14px;">${resetUrl}</p>
+                <p>Если вы не запрашивали сброс, просто проигнорируйте это письмо. Ваш пароль останется прежним.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+                <p style="font-size: 0.8em; color: #999; text-align: center;">Эта ссылка действительна в течение 1 часа.</p>
               </div>
             `,
           });
-          res.json({ success: true, message: "Email sent" });
-        } catch (mailError) {
+
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('SMTP Timeout')), 10000)
+          );
+
+          await Promise.race([mailPromise, timeoutPromise]);
+          
+          console.log(`Email successfully sent to ${email}`);
+          return res.json({ success: true, message: "Инструкции по сбросу пароля отправлены на ваш email" });
+        } catch (mailError: any) {
           console.error("Failed to send email:", mailError);
-          res.status(500).json({ error: "Failed to send email" });
+          // Even if email fails, we return success in some cases to prevent email enumeration, 
+          // but here we want to help the user debug.
+          return res.status(500).json({ 
+            error: "Ошибка при отправке письма. Пожалуйста, проверьте настройки SMTP или попробуйте позже.",
+            details: mailError.message 
+          });
         }
       } else {
-        res.json({ success: true, message: "Reset token generated (SMTP not configured)" });
+        console.log("SMTP not configured, but token generated.");
+        return res.json({ success: true, message: "Токен сброса сгенерирован (SMTP не настроен). Проверьте консоль сервера." });
       }
     } catch (error) {
       console.error("Forgot password error:", error);
-      res.status(500).json({ error: "Internal server error" });
+      return res.status(500).json({ error: "Внутренняя ошибка сервера" });
     }
   });
 
@@ -445,6 +468,26 @@ async function startServer() {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/users/me/generate-password", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
+    const authToken = authHeader.split(' ')[1];
+    
+    try {
+      const decoded = jwt.verify(authToken, JWT_SECRET) as any;
+      const newPassword = generateRandomPassword(12);
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      
+      await pool.query("UPDATE users SET password = $1 WHERE id = $2", [hashedPassword, decoded.id]);
+      await logAction(decoded.id, null, 'PASSWORD_GENERATED', { timestamp: new Date().toISOString() });
+      
+      res.json({ success: true, newPassword });
+    } catch (error) {
+      console.error("Error generating password:", error);
+      res.status(401).json({ error: "Invalid token" });
     }
   });
 

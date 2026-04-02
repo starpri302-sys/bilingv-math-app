@@ -174,6 +174,15 @@ export const api = {
     });
     return handleResponse(res);
   },
+  async generateNewPassword(token: string) {
+    const res = await fetch('/api/users/me/generate-password', {
+      method: 'POST',
+      headers: { 
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    return handleResponse(res);
+  },
   async changePassword(token: string, data: any) {
     const res = await fetch('/api/users/me/password', {
       method: 'PATCH',

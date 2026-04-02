@@ -29,6 +29,9 @@ export default function Profile() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState('');
   const [showPasswords, setShowPasswords] = useState(false);
+  const [generatedPassword, setGeneratedPassword] = useState('');
+  const [showGeneratedModal, setShowGeneratedModal] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -131,6 +134,29 @@ export default function Profile() {
       setPasswordMessage(`Ошибка: ${error.message || 'Не удалось сменить пароль'}`);
     } finally {
       setPasswordSaving(false);
+    }
+  };
+
+  const handleGeneratePassword = async () => {
+    if (!window.confirm('Вы уверены, что хотите сгенерировать новый пароль? Текущий пароль перестанет работать.')) {
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) throw new Error('No token');
+      
+      const res = await api.generateNewPassword(token);
+      if (res.success) {
+        setGeneratedPassword(res.newPassword);
+        setShowGeneratedModal(true);
+      }
+    } catch (error: any) {
+      console.error('Error generating password:', error);
+      setPasswordMessage(`Ошибка: ${error.message || 'Не удалось сгенерировать пароль'}`);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -391,6 +417,16 @@ export default function Profile() {
             <Save className="w-5 h-5" />
             {passwordSaving ? 'Обновление...' : 'Сменить пароль'}
           </button>
+          
+          <button
+            type="button"
+            onClick={handleGeneratePassword}
+            disabled={isGenerating}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 px-8 py-4 rounded-2xl hover:bg-emerald-100 transition-all font-bold disabled:opacity-50"
+          >
+            <Key className="w-5 h-5" />
+            {isGenerating ? 'Генерация...' : 'Сгенерировать новый пароль'}
+          </button>
         </div>
       </motion.form>
 
@@ -442,6 +478,58 @@ export default function Profile() {
           </div>
         )}
       </section>
+
+      {/* Modal for Generated Password */}
+      <AnimatePresence>
+        {showGeneratedModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white rounded-3xl p-8 sm:p-12 max-w-md w-full shadow-2xl border border-stone-200 text-center space-y-8"
+            >
+              <div className="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center text-emerald-600 mx-auto">
+                <ShieldCheck className="w-10 h-10" />
+              </div>
+              
+              <div className="space-y-2">
+                <h2 className="text-3xl font-serif font-black text-stone-900">Пароль обновлен!</h2>
+                <p className="text-stone-500 font-medium">Ваш новый автоматически сгенерированный пароль:</p>
+              </div>
+              
+              <div className="p-6 bg-stone-50 border-2 border-dashed border-emerald-200 rounded-2xl relative group">
+                <span className="text-3xl font-mono font-bold text-emerald-700 tracking-wider">
+                  {generatedPassword}
+                </span>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(generatedPassword);
+                    alert('Пароль скопирован!');
+                  }}
+                  className="absolute -top-3 -right-3 p-2 bg-white border border-stone-200 rounded-xl shadow-sm hover:bg-stone-50 transition-all"
+                  title="Копировать"
+                >
+                  <Save className="w-4 h-4 text-stone-400" />
+                </button>
+              </div>
+              
+              <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl text-left">
+                <p className="text-xs text-amber-800 font-medium leading-relaxed">
+                  <b>Важно:</b> Пожалуйста, сохраните этот пароль в надежном месте. Мы не храним его в открытом виде, и вы не сможете увидеть его снова после закрытия этого окна.
+                </p>
+              </div>
+              
+              <button
+                onClick={() => setShowGeneratedModal(false)}
+                className="w-full py-4 bg-stone-900 text-white rounded-2xl font-bold hover:bg-stone-800 transition-all shadow-lg"
+              >
+                Я сохранил пароль
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
