@@ -33,9 +33,10 @@ const createTransporter = (port: number, secure: boolean) => {
     tls: {
       rejectUnauthorized: false, // Helps with some VPS network configurations
       minVersion: 'TLSv1.2'
-    }
+    },
+    // Force IPv4 to avoid ENETUNREACH on IPv6
+    family: 4
   } as any);
-  (t as any).options.family = 4;
   return t;
 };
 
