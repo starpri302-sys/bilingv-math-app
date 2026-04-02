@@ -14,8 +14,9 @@ export default function Profile() {
     username: '',
     full_name: '',
     school: '',
-    grade: '',
-    avatar: ''
+    avatar: '',
+    contact_info: '',
+    bio: ''
   });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -32,8 +33,9 @@ export default function Profile() {
         username: profile.username || '',
         full_name: profile.full_name || '',
         school: profile.school || '',
-        grade: profile.grade || '',
-        avatar: profile.avatar || ''
+        avatar: profile.avatar || '',
+        contact_info: profile.contact_info || '',
+        bio: profile.bio || ''
       });
       fetchUserTerms();
     }
@@ -210,34 +212,40 @@ export default function Profile() {
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-stone-400">
               <School className="w-4 h-4" />
-              Школа
+              Учебное заведение
             </label>
             <input
               type="text"
               value={formData.school}
               onChange={(e) => setFormData({ ...formData, school: e.target.value })}
               className="w-full p-4 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
-              placeholder="Школа №1"
+              placeholder="Школа №1 или Университет"
             />
           </div>
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-stone-400">
-              <GraduationCap className="w-4 h-4" />
-              Класс
+              <Mail className="w-4 h-4" />
+              Контактные данные
             </label>
-            <div className="relative">
-              <select
-                value={formData.grade}
-                onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
-                className="w-full p-4 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium appearance-none"
-              >
-                <option value="">Выберите класс</option>
-                {[5, 6, 7, 8, 9, 10, 11].map((g) => (
-                  <option key={g} value={g.toString()}>{g} класс</option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400 pointer-events-none" />
-            </div>
+            <input
+              type="text"
+              value={formData.contact_info}
+              onChange={(e) => setFormData({ ...formData, contact_info: e.target.value })}
+              className="w-full p-4 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
+              placeholder="Телефон, Telegram или другой способ связи"
+            />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-stone-400">
+              <BookOpen className="w-4 h-4" />
+              О себе
+            </label>
+            <textarea
+              value={formData.bio}
+              onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+              className="w-full p-4 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium min-h-[120px] resize-none"
+              placeholder="Расскажите немного о себе, ваших интересах в математике или опыте..."
+            />
           </div>
           <div className="space-y-2 sm:col-span-2">
             <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-stone-400">

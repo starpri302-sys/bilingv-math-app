@@ -545,9 +545,9 @@ export default function AdminPanel() {
                         <span className="px-2 py-0.5 bg-stone-100 text-stone-600 rounded text-[10px] font-bold uppercase tracking-widest border border-stone-200">
                           {u.role}
                         </span>
-                        {u.grade && (
-                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[10px] font-bold uppercase tracking-widest border border-emerald-100">
-                            {u.grade} класс
+                        {u.contact_info && (
+                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[10px] font-bold uppercase tracking-widest border border-emerald-100 truncate max-w-[100px]">
+                            {u.contact_info}
                           </span>
                         )}
                       </div>

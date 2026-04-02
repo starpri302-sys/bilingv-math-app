@@ -146,36 +146,17 @@ export default function Register() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-stone-400 ml-1">Школа</label>
-                <div className="relative">
-                  <School className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400" />
-                  <input
-                    type="text"
-                    value={formData.school}
-                    onChange={(e) => setFormData({ ...formData, school: e.target.value })}
-                    className="w-full pl-12 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
-                    placeholder="№1"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-stone-400 ml-1">Класс</label>
-                <div className="relative">
-                  <GraduationCap className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400 z-10" />
-                  <select
-                    value={formData.grade}
-                    onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
-                    className="w-full pl-12 pr-10 py-3 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium appearance-none"
-                  >
-                    <option value="">Класс</option>
-                    {[5, 6, 7, 8, 9, 10, 11].map((g) => (
-                      <option key={g} value={g.toString()}>{g}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
-                </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-stone-400 ml-1">Учебное заведение</label>
+              <div className="relative">
+                <School className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400" />
+                <input
+                  type="text"
+                  value={formData.school}
+                  onChange={(e) => setFormData({ ...formData, school: e.target.value })}
+                  className="w-full pl-12 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
+                  placeholder="Школа №1 или Университет"
+                />
               </div>
             </div>
           </div>

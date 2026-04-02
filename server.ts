@@ -136,6 +136,8 @@ async function initDb(forceReinstall = false) {
         school TEXT,
         grade TEXT,
         avatar TEXT,
+        contact_info TEXT,
+        bio TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -577,7 +579,7 @@ async function startServer() {
 
   // Users API
   app.get("/api/users/:id", async (req, res) => {
-    const userRes = await pool.query("SELECT id, username, full_name, school, grade, avatar, role FROM users WHERE id = $1", [req.params.id]);
+    const userRes = await pool.query("SELECT id, username, full_name, school, grade, avatar, role, contact_info, bio FROM users WHERE id = $1", [req.params.id]);
     res.json(userRes.rows[0] || null);
   });
 
@@ -710,7 +712,7 @@ async function startServer() {
 
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
-      const { id, username, email, role, full_name, school, grade, avatar } = req.body;
+      const { id, username, email, role, full_name, school, grade, avatar, contact_info, bio } = req.body;
 
       // Ensure user can only update their own profile unless they are an admin
       if (decoded.id !== id && decoded.role !== 'super_admin' && decoded.role !== 'chief_editor') {
@@ -718,15 +720,17 @@ async function startServer() {
       }
 
       await pool.query(`
-        INSERT INTO users (id, username, email, role, full_name, school, grade, avatar)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO users (id, username, email, role, full_name, school, grade, avatar, contact_info, bio)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT(id) DO UPDATE SET
           username=EXCLUDED.username,
           full_name=EXCLUDED.full_name,
           school=EXCLUDED.school,
           grade=EXCLUDED.grade,
-          avatar=EXCLUDED.avatar
-      `, [id, username, email, role || 'student', full_name, school, grade, avatar]);
+          avatar=EXCLUDED.avatar,
+          contact_info=EXCLUDED.contact_info,
+          bio=EXCLUDED.bio
+      `, [id, username, email, role || 'student', full_name, school, grade, avatar, contact_info, bio]);
       res.json({ success: true });
     } catch (error) {
       console.error('Error saving user:', error);

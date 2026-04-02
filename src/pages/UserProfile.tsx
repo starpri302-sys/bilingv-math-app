@@ -94,10 +94,10 @@ export default function UserProfile() {
                   <span className="text-sm font-bold">{user.school}</span>
                 </div>
               )}
-              {user.grade && (
+              {user.contact_info && (
                 <div className="flex items-center gap-2 text-stone-600 bg-stone-50 px-4 py-2 rounded-xl border border-stone-100">
-                  <GraduationCap className="w-4 h-4 text-emerald-600" />
-                  <span className="text-sm font-bold">{user.grade} класс</span>
+                  <Mail className="w-4 h-4 text-emerald-600" />
+                  <span className="text-sm font-bold">{user.contact_info}</span>
                 </div>
               )}
               <div className="flex items-center gap-2 text-stone-600 bg-stone-50 px-4 py-2 rounded-xl border border-stone-100">
@@ -105,6 +105,12 @@ export default function UserProfile() {
                 <span className="text-sm font-bold">{terms.length} терминов</span>
               </div>
             </div>
+
+            {user.bio && (
+              <div className="pt-4 text-stone-600 font-medium leading-relaxed max-w-2xl">
+                <p className="whitespace-pre-wrap">{user.bio}</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
