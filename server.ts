@@ -30,6 +30,10 @@ const createTransporter = (port: number, secure: boolean) => {
     connectionTimeout: 10000,
     greetingTimeout: 10000,
     socketTimeout: 10000,
+    tls: {
+      rejectUnauthorized: false, // Helps with some VPS network configurations
+      minVersion: 'TLSv1.2'
+    }
   } as any);
   (t as any).options.family = 4;
   return t;
@@ -41,18 +45,29 @@ const primaryTransporter = createTransporter(
 );
 
 const fallbackTransporter = createTransporter(587, false);
+const extraFallbackTransporter = createTransporter(2525, false); // Port 2525 is often open on VPS
 
 async function sendEmailWithFallback(mailOptions: any) {
+  // Ensure 'from' matches SMTP_USER for Mail.ru compatibility
+  if (process.env.SMTP_USER) {
+    mailOptions.from = process.env.SMTP_FROM || `"Bilingual Math" <${process.env.SMTP_USER}>`;
+  }
+
   try {
-    console.log(`Attempting to send email via primary port...`);
+    console.log(`Attempting to send email via primary port ${process.env.SMTP_PORT || 465}...`);
     return await primaryTransporter.sendMail(mailOptions);
   } catch (error: any) {
-    console.warn(`Primary SMTP failed (Port ${process.env.SMTP_PORT || 465}): ${error.message}. Trying fallback port 587...`);
+    console.warn(`Primary SMTP failed: ${error.message}. Trying port 587...`);
     try {
       return await fallbackTransporter.sendMail(mailOptions);
     } catch (fallbackError: any) {
-      console.error(`Fallback SMTP also failed: ${fallbackError.message}`);
-      throw fallbackError;
+      console.warn(`Port 587 failed: ${fallbackError.message}. Trying port 2525...`);
+      try {
+        return await extraFallbackTransporter.sendMail(mailOptions);
+      } catch (lastError: any) {
+        console.error(`All SMTP ports (465, 587, 2525) failed.`);
+        throw lastError;
+      }
     }
   }
 }
