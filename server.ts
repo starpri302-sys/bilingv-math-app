@@ -545,35 +545,6 @@ async function startServer() {
     }
   });
 
-  app.patch("/api/users/me/password", async (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
-    const authToken = authHeader.split(' ')[1];
-    
-    try {
-      const decoded = jwt.verify(authToken, JWT_SECRET) as any;
-      const { currentPassword, newPassword } = req.body;
-      
-      try {
-        const userRes = await pool.query("SELECT * FROM users WHERE id = $1", [decoded.id]);
-        const user = userRes.rows[0];
-        if (!user || !(await bcrypt.compare(currentPassword, user.password))) {
-          return res.status(401).json({ error: "Invalid current password" });
-        }
-
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-        await pool.query("UPDATE users SET password = $1 WHERE id = $2", [hashedPassword, decoded.id]);
-        
-        res.json({ success: true });
-      } catch (dbError: any) {
-        console.error("Database error in password change:", dbError);
-        res.status(500).json({ error: "Internal server error" });
-      }
-    } catch (jwtError) {
-      res.status(401).json({ error: "Invalid token" });
-    }
-  });
-
   // Admin Role Management
   app.patch("/api/admin/users/:id/role", async (req, res) => {
     const { role, admin_role } = req.body;

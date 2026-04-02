@@ -183,17 +183,6 @@ export const api = {
     });
     return handleResponse(res);
   },
-  async changePassword(token: string, data: any) {
-    const res = await fetch('/api/users/me/password', {
-      method: 'PATCH',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(data)
-    });
-    return handleResponse(res);
-  },
   async forgotPassword(email: string) {
     const res = await fetch('/api/auth/forgot-password', {
       method: 'POST',

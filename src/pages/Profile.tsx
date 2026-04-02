@@ -21,14 +21,7 @@ export default function Profile() {
   const [message, setMessage] = useState('');
   const [userTerms, setUserTerms] = useState<any[]>([]);
   const [termsLoading, setTermsLoading] = useState(true);
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  });
-  const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState('');
-  const [showPasswords, setShowPasswords] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState('');
   const [showGeneratedModal, setShowGeneratedModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -94,46 +87,6 @@ export default function Profile() {
       setMessage('Ошибка при обновлении профиля.');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !profile) return;
-
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setPasswordMessage('Ошибка: Пароли не совпадают');
-      return;
-    }
-
-    if (passwordData.newPassword.length < 6) {
-      setPasswordMessage('Ошибка: Пароль должен быть не менее 6 символов');
-      return;
-    }
-
-    setPasswordSaving(true);
-    setPasswordMessage('');
-    try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) throw new Error('No token');
-      
-      const res = await api.changePassword(token, {
-        currentPassword: passwordData.currentPassword,
-        newPassword: passwordData.newPassword
-      });
-
-      if (res.success) {
-        setPasswordMessage('Пароль успешно изменен!');
-        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-        setTimeout(() => setPasswordMessage(''), 3000);
-      } else {
-        setPasswordMessage(`Ошибка: ${res.error || 'Не удалось сменить пароль'}`);
-      }
-    } catch (error: any) {
-      console.error('Error changing password:', error);
-      setPasswordMessage(`Ошибка: ${error.message || 'Не удалось сменить пароль'}`);
-    } finally {
-      setPasswordSaving(false);
     }
   };
 
@@ -333,73 +286,28 @@ export default function Profile() {
         </div>
       </motion.form>
 
-      <motion.form
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        onSubmit={handlePasswordSubmit}
         className="bg-white p-8 sm:p-12 rounded-3xl border border-stone-200 shadow-sm space-y-8"
       >
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 bg-stone-100 rounded-xl flex items-center justify-center text-stone-600">
             <ShieldCheck className="w-5 h-5" />
           </div>
-          <h2 className="text-2xl font-serif font-black text-stone-900">Конфиденциальность</h2>
+          <h2 className="text-2xl font-serif font-black text-stone-900">Безопасность</h2>
         </div>
         
-        <div className="grid grid-cols-1 gap-8">
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-stone-400">
-              <Key className="w-4 h-4" />
-              Текущий пароль
-            </label>
-            <div className="relative">
-              <input
-                type={showPasswords ? "text" : "password"}
-                value={passwordData.currentPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                className="w-full p-4 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
-                placeholder="••••••••"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPasswords(!showPasswords)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
-              >
-                {showPasswords ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-stone-400">
-                <Lock className="w-4 h-4" />
-                Новый пароль
-              </label>
-              <input
-                type={showPasswords ? "text" : "password"}
-                value={passwordData.newPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                className="w-full p-4 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
-                placeholder="••••••••"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-stone-400">
-                <CheckCircle className="w-4 h-4" />
-                Подтвердите пароль
-              </label>
-              <input
-                type={showPasswords ? "text" : "password"}
-                value={passwordData.confirmPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                className="w-full p-4 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
-                placeholder="••••••••"
-                required
-              />
-            </div>
+        <div className="bg-stone-50 p-6 rounded-2xl border border-stone-200 space-y-4">
+          <p className="text-stone-600 font-medium leading-relaxed">
+            Для обеспечения максимальной безопасности мы используем только автоматически сгенерированные надежные пароли. 
+            Вы можете обновить свой пароль в любое время, нажав на кнопку ниже.
+          </p>
+          <div className="flex items-start gap-3 text-amber-700 bg-amber-50 p-4 rounded-xl border border-amber-100">
+            <Lock className="w-5 h-5 mt-0.5 flex-shrink-0" />
+            <p className="text-xs font-medium">
+              <b>Внимание:</b> После генерации старый пароль перестанет работать. Обязательно сохраните новый пароль в надежном месте.
+            </p>
           </div>
         </div>
 
@@ -409,26 +317,18 @@ export default function Profile() {
               {passwordMessage}
             </p>
           )}
-          <button
-            type="submit"
-            disabled={passwordSaving}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-stone-900 text-white px-8 py-4 rounded-2xl hover:bg-stone-800 transition-all shadow-md hover:shadow-lg font-bold disabled:opacity-50"
-          >
-            <Save className="w-5 h-5" />
-            {passwordSaving ? 'Обновление...' : 'Сменить пароль'}
-          </button>
           
           <button
             type="button"
             onClick={handleGeneratePassword}
             disabled={isGenerating}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 px-8 py-4 rounded-2xl hover:bg-emerald-100 transition-all font-bold disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-3 bg-stone-900 text-white px-8 py-5 rounded-2xl hover:bg-stone-800 transition-all shadow-lg hover:shadow-xl font-bold disabled:opacity-50 text-lg"
           >
-            <Key className="w-5 h-5" />
-            {isGenerating ? 'Генерация...' : 'Сгенерировать новый пароль'}
+            <Key className="w-6 h-6" />
+            {isGenerating ? 'Генерация...' : 'Сгенерировать новый надежный пароль'}
           </button>
         </div>
-      </motion.form>
+      </motion.div>
 
       <section className="space-y-8">
         <div className="flex items-center justify-between">
