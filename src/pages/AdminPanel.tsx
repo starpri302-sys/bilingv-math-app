@@ -5,7 +5,7 @@ import BilingualEditor from '../components/BilingualEditor';
 import UserAvatar from '../components/UserAvatar';
 import ConfirmModal from '../components/ConfirmModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { Shield, CheckCircle, Trash2, Clock, Info, Plus, Languages, Book, Calculator, Settings, Edit3, Terminal, Download, Database as DbIcon, Upload, FileJson, X } from 'lucide-react';
+import { Shield, CheckCircle, Trash2, Clock, Info, Plus, Languages, Book, Calculator, Settings, Edit3, Terminal, Download, Database as DbIcon, Upload, FileJson, X, Key } from 'lucide-react';
 
 type AdminTab = 'moderation' | 'subjects' | 'languages' | 'users' | 'system';
 
@@ -19,6 +19,7 @@ export default function AdminPanel() {
   const [logs, setLogs] = useState<any[]>([]);
   const [fetching, setFetching] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [resetPasswordInfo, setResetPasswordInfo] = useState<{ username: string, password: string } | null>(null);
 
   // Modal states
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void; isDestructive?: boolean }>({
@@ -92,6 +93,26 @@ export default function AdminPanel() {
         } catch (error) {
           console.error('Error deleting user:', error);
           setAlertMessage({ isOpen: true, title: 'Ошибка', message: 'Не удалось удалить пользователя.' });
+        }
+      }
+    });
+  };
+
+  const handleResetUserPassword = async (user: any) => {
+    if (!isSuperAdmin) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Сброс пароля',
+      message: `Вы уверены, что хотите сбросить пароль для пользователя ${user.username || user.full_name}? Будет сгенерирован новый случайный пароль.`,
+      onConfirm: async () => {
+        try {
+          const res = await api.resetUserPassword(user.id, profile?.role || '');
+          if (res.success) {
+            setResetPasswordInfo({ username: user.username || user.full_name, password: res.newPassword });
+          }
+        } catch (error) {
+          console.error('Error resetting user password:', error);
+          setAlertMessage({ isOpen: true, title: 'Ошибка', message: 'Не удалось сбросить пароль.' });
         }
       }
     });
@@ -549,6 +570,13 @@ export default function AdminPanel() {
                         </select>
                       </div>
                       <button
+                        onClick={() => handleResetUserPassword(u)}
+                        className="w-full flex items-center justify-center gap-2 p-2 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-xl text-xs font-bold uppercase tracking-widest transition-all"
+                      >
+                        <Key className="w-3 h-3" />
+                        Сбросить пароль
+                      </button>
+                      <button
                         onClick={() => handleDeleteUser(u.id)}
                         className="w-full flex items-center justify-center gap-2 p-2 bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 rounded-xl text-xs font-bold uppercase tracking-widest transition-all"
                       >
@@ -658,6 +686,38 @@ export default function AdminPanel() {
             }} 
             initialData={editingTerm} 
           />
+        )}
+
+        {resetPasswordInfo && (
+          <div className="fixed inset-0 bg-stone-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white p-8 rounded-3xl border border-stone-200 shadow-2xl max-w-md w-full space-y-6"
+            >
+              <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+                <Key className="w-8 h-8" />
+              </div>
+              <div className="text-center space-y-2">
+                <h3 className="text-2xl font-serif font-black text-stone-900">Пароль сброшен</h3>
+                <p className="text-stone-500 font-medium">Новый пароль для пользователя <strong>{resetPasswordInfo.username}</strong>:</p>
+              </div>
+              <div className="p-4 bg-stone-100 rounded-2xl border border-stone-200 text-center">
+                <code className="text-2xl font-mono font-bold text-stone-900 tracking-wider select-all">
+                  {resetPasswordInfo.password}
+                </code>
+              </div>
+              <p className="text-xs text-red-500 font-bold text-center uppercase tracking-widest">
+                Скопируйте и передайте этот пароль пользователю. Он больше не будет показан!
+              </p>
+              <button
+                onClick={() => setResetPasswordInfo(null)}
+                className="w-full bg-stone-900 text-white p-4 rounded-2xl font-bold hover:bg-stone-800 transition-all"
+              >
+                Понятно
+              </button>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

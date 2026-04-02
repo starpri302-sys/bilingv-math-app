@@ -9,6 +9,7 @@ import helmet from "helmet";
 import compression from "compression";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import nodemailer from 'nodemailer';
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import pool from "./db";
@@ -16,6 +17,16 @@ import pool from "./db";
 dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret";
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.example.com',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const finalPort = isNaN(PORT) || PORT <= 0 || PORT > 65535 ? 3000 : PORT;
 
@@ -29,6 +40,15 @@ async function logAction(userId: string | null, username: string | null, action:
   } catch (error) {
     console.error("Logging Error:", error);
   }
+}
+
+function generateRandomPassword(length = 12) {
+  const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+  let retVal = "";
+  for (let i = 0, n = charset.length; i < length; ++i) {
+    retVal += charset.charAt(Math.floor(Math.random() * n));
+  }
+  return retVal;
 }
 
 // Initialize database schema
@@ -266,7 +286,7 @@ async function startServer() {
 
   const authLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 100, // Increased from 10 to 100
+    max: 10, // Decreased from 100 to 10 for security
     standardHeaders: true,
     legacyHeaders: false,
     validate: false,
@@ -371,9 +391,39 @@ async function startServer() {
         ON CONFLICT (email) DO UPDATE SET token = EXCLUDED.token, expires = EXCLUDED.expires
       `, [email, token, expires]);
 
+      const resetUrl = `${process.env.APP_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
+      
       console.log(`PASSWORD RESET TOKEN FOR ${email}: ${token}`);
-      res.json({ success: true, message: "Reset token generated" });
+      console.log(`RESET URL: ${resetUrl}`);
+
+      if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+        try {
+          await transporter.sendMail({
+            from: process.env.SMTP_FROM || '"Bilingual Math" <no-reply@example.com>',
+            to: email,
+            subject: "Сброс пароля - Bilingual Math",
+            html: `
+              <div style="font-family: sans-serif; padding: 20px; color: #333;">
+                <h2>Сброс пароля</h2>
+                <p>Вы получили это письмо, потому что вы (или кто-то другой) запросили сброс пароля для вашего аккаунта.</p>
+                <p>Пожалуйста, перейдите по ссылке ниже, чтобы завершить процесс:</p>
+                <a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; background-color: #10b981; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Сбросить пароль</a>
+                <p>Если вы не запрашивали сброс, просто проигнорируйте это письмо.</p>
+                <hr />
+                <p style="font-size: 0.8em; color: #666;">Эта ссылка действительна в течение 1 часа.</p>
+              </div>
+            `,
+          });
+          res.json({ success: true, message: "Email sent" });
+        } catch (mailError) {
+          console.error("Failed to send email:", mailError);
+          res.status(500).json({ error: "Failed to send email" });
+        }
+      } else {
+        res.json({ success: true, message: "Reset token generated (SMTP not configured)" });
+      }
     } catch (error) {
+      console.error("Forgot password error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -436,6 +486,22 @@ async function startServer() {
     try {
       await pool.query("UPDATE users SET role = $1 WHERE id = $2", [role, req.params.id]);
       res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/admin/users/:id/reset-password", async (req, res) => {
+    const { admin_role } = req.body;
+    if (admin_role !== 'super_admin') return res.status(403).json({ error: "Forbidden" });
+    
+    const { id } = req.params;
+    const newPassword = generateRandomPassword(12);
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    try {
+      await pool.query("UPDATE users SET password = $1 WHERE id = $2", [hashedPassword, id]);
+      res.json({ success: true, newPassword });
     } catch (error) {
       res.status(500).json({ error: "Internal server error" });
     }

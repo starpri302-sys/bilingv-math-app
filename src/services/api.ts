@@ -57,6 +57,14 @@ export const api = {
     const res = await fetch('/api/admin/users');
     return handleResponse(res);
   },
+  async resetUserPassword(userId: string, adminRole: string) {
+    const res = await fetch(`/api/admin/users/${userId}/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admin_role: adminRole })
+    });
+    return handleResponse(res);
+  },
   async deleteUser(id: string) {
     const res = await fetch(`/api/admin/users/${id}`, {
       method: 'DELETE',
