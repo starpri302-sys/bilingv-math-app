@@ -18,9 +18,10 @@ dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret";
 
-const createTransporter = (port: number, secure: boolean) => {
+const createTransporter = (port: number, secure: boolean, hostOverride?: string) => {
+  const host = hostOverride || process.env.SMTP_HOST || 'smtp.mail.ru';
   const t = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.mail.ru',
+    host: host,
     port: port,
     secure: secure,
     auth: {
@@ -31,11 +32,12 @@ const createTransporter = (port: number, secure: boolean) => {
     greetingTimeout: 10000,
     socketTimeout: 10000,
     tls: {
-      rejectUnauthorized: false, // Helps with some VPS network configurations
-      minVersion: 'TLSv1.2'
+      rejectUnauthorized: false,
+      minVersion: 'TLSv1.2',
+      // Crucial when using IP address: tell the server which domain we expect
+      servername: 'smtp.mail.ru'
     },
-    // Force IPv4 to avoid ENETUNREACH on IPv6
-    family: 4
+    family: 4 // Force IPv4
   } as any);
   return t;
 };
@@ -45,8 +47,9 @@ const primaryTransporter = createTransporter(
   process.env.SMTP_SECURE !== 'false'
 );
 
-const fallbackTransporter = createTransporter(587, false);
-const extraFallbackTransporter = createTransporter(2525, false); // Port 2525 is often open on VPS
+// Fallback using direct IPv4 of smtp.mail.ru to bypass IPv6 issues
+const fallbackTransporter = createTransporter(587, false, '94.100.180.160');
+const extraFallbackTransporter = createTransporter(2525, false, '94.100.180.160');
 
 async function sendEmailWithFallback(mailOptions: any) {
   // Ensure 'from' matches SMTP_USER for Mail.ru compatibility
@@ -351,6 +354,17 @@ async function startServer() {
   });
 
   // Auth API
+  // Verify SMTP on startup
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    primaryTransporter.verify((error) => {
+      if (error) {
+        console.warn("SMTP Primary Verification Failed. Check your .env settings and port 465 access.");
+      } else {
+        console.log("SMTP Primary Connection Ready!");
+      }
+    });
+  }
+
   app.post("/api/auth/register", async (req, res) => {
     const { username, email, full_name, school, grade } = req.body;
     try {
