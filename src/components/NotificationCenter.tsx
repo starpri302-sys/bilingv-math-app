@@ -3,7 +3,7 @@ import { Bell, Check, Trash2, X, ExternalLink } from 'lucide-react';
 import { useAuth } from '../store/authContext';
 import { api } from '../services/api';
 import { motion, AnimatePresence } from 'motion/react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface Notification {
   id: string;
@@ -16,7 +16,8 @@ interface Notification {
 }
 
 export default function NotificationCenter() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -69,6 +70,16 @@ export default function NotificationCenter() {
     }
   };
 
+  const handleNotificationClick = (notification: Notification) => {
+    setIsOpen(false);
+    handleMarkRead(notification.id);
+    if (notification.type === 'term_pending' && isAdmin) {
+      navigate('/admin');
+    } else if (notification.term_id) {
+      navigate(`/term/${notification.term_id}`);
+    }
+  };
+
   return (
     <div className="relative" ref={dropdownRef}>
       <button
@@ -110,7 +121,8 @@ export default function NotificationCenter() {
                   {notifications.map((notification) => (
                     <div
                       key={notification.id}
-                      className={`p-4 transition-colors ${notification.is_read ? 'bg-white' : 'bg-emerald-50/30'}`}
+                      onClick={() => handleNotificationClick(notification)}
+                      className={`p-4 transition-colors cursor-pointer hover:bg-stone-50 ${notification.is_read ? 'bg-white' : 'bg-emerald-50/30'}`}
                     >
                       <div className="flex justify-between gap-2 mb-1">
                         <p className={`text-sm ${notification.is_read ? 'text-stone-600' : 'text-stone-900 font-medium'}`}>
@@ -119,7 +131,10 @@ export default function NotificationCenter() {
                         <div className="flex gap-1 shrink-0">
                           {!notification.is_read && (
                             <button
-                              onClick={() => handleMarkRead(notification.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkRead(notification.id);
+                              }}
                               className="p-1 text-emerald-600 hover:bg-emerald-100 rounded-md transition-colors"
                               title="Mark as read"
                             >
@@ -127,7 +142,10 @@ export default function NotificationCenter() {
                             </button>
                           )}
                           <button
-                            onClick={() => handleDelete(notification.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(notification.id);
+                            }}
                             className="p-1 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                             title="Delete"
                           >
@@ -145,16 +163,9 @@ export default function NotificationCenter() {
                           })}
                         </span>
                         {notification.term_id && (
-                          <Link
-                            to={`/term/${notification.term_id}`}
-                            onClick={() => {
-                              setIsOpen(false);
-                              handleMarkRead(notification.id);
-                            }}
-                            className="text-[10px] text-emerald-600 hover:underline flex items-center gap-0.5"
-                          >
+                          <div className="text-[10px] text-emerald-600 hover:underline flex items-center gap-0.5">
                             Посмотреть <ExternalLink className="w-2.5 h-2.5" />
-                          </Link>
+                          </div>
                         )}
                       </div>
                     </div>

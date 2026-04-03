@@ -12,7 +12,16 @@ export default function TermCard({ term, language }: TermCardProps) {
   const translation = term.translations?.find((t: any) => t.lang_code === language) || term.translations?.[0] || {};
   const name = translation.name || 'No Name';
   const rawDefinition = translation.definition || '';
-  const definition = rawDefinition.replace(/<[^>]*>/g, '');
+  
+  // Strip HTML tags and decode common entities like &nbsp;
+  const definition = rawDefinition
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
 
   const author = {
     username: term.author_name,

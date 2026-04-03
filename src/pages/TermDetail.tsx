@@ -85,7 +85,15 @@ export default function TermDetail() {
     <div className="max-w-5xl mx-auto space-y-12">
       <SEO 
         title={term.translations?.[0]?.name || 'Термин'} 
-        description={term.translations?.[0]?.definition?.replace(/<[^>]*>/g, '').substring(0, 160)}
+        description={term.translations?.[0]?.definition
+          ?.replace(/<[^>]*>/g, '')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .substring(0, 160)}
         canonical={`https://bilingvmath.ru/term/${id}`}
       />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">

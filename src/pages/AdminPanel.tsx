@@ -343,7 +343,14 @@ export default function AdminPanel() {
                         {term.translations?.map((t: any) => t.name).join(' / ')}
                       </h3>
                       <p className="text-stone-500 text-sm line-clamp-3 italic break-words">
-                        {term.translations?.[0]?.definition?.replace(/<[^>]*>/g, '')}
+                        {term.translations?.[0]?.definition
+                          ?.replace(/<[^>]*>/g, '')
+                          .replace(/&nbsp;/g, ' ')
+                          .replace(/&amp;/g, '&')
+                          .replace(/&lt;/g, '<')
+                          .replace(/&gt;/g, '>')
+                          .replace(/&quot;/g, '"')
+                          .replace(/&#39;/g, "'")}
                       </p>
                     </div>
 
