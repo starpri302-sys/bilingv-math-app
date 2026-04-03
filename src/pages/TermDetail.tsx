@@ -81,6 +81,15 @@ export default function TermDetail() {
     );
   }
 
+  const activeLanguages = languages.filter(lang => viewMode === 'both' || viewMode === lang.code);
+  const isBoth = viewMode === 'both';
+  const hasExample = activeLanguages.some(lang => 
+    term.translations?.find((t: any) => t.lang_code === lang.code)?.example
+  );
+  const hasAdditional = activeLanguages.some(lang => 
+    term.translations?.find((t: any) => t.lang_code === lang.code)?.additional
+  );
+
   return (
     <div className="max-w-5xl mx-auto space-y-12">
       <SEO 
@@ -143,88 +152,209 @@ export default function TermDetail() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="grid grid-cols-1 lg:grid-cols-2 gap-8"
       >
-        {/* Dynamic Content */}
-        {languages.filter(lang => viewMode === 'both' || viewMode === lang.code).map((lang) => {
-          const translation = term.translations?.find((t: any) => t.lang_code === lang.code);
-          if (!translation) return null;
-
-          return (
-            <div 
-              key={lang.code}
-              className={`space-y-8 p-8 bg-white rounded-3xl border border-stone-200 shadow-sm transition-all ${viewMode === lang.code ? 'lg:col-span-2' : ''}`}
-            >
-              <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest">
-                <Languages className="w-4 h-4" />
-                <span>{lang.name}</span>
-              </div>
-              <h1 className="font-serif text-4xl sm:text-5xl font-black text-stone-900 leading-tight">
-                {translation.name}
-              </h1>
-              <div className="space-y-6">
-                <section className="space-y-3">
-                  <h3 className="flex items-center gap-2 text-stone-400 font-bold text-xs uppercase tracking-widest">
-                    <Book className="w-4 h-4" />
-                    Определение
-                  </h3>
-                  <div 
-                    className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone max-w-none"
-                    dangerouslySetInnerHTML={{ __html: translation.definition }}
-                  />
-                </section>
-                {translation.example && (
-                  <section className="space-y-3 p-6 bg-emerald-50 rounded-2xl border border-emerald-100">
-                    <h3 className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest">
-                      <Lightbulb className="w-4 h-4" />
-                      Пример
-                    </h3>
-                    <div 
-                      className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald max-w-none"
-                      dangerouslySetInnerHTML={{ __html: translation.example }}
-                    />
-                  </section>
-                )}
-                {translation.additional && (
-                  <section className="space-y-3">
-                    <h3 className="text-stone-400 font-bold text-xs uppercase tracking-widest">Дополнительно</h3>
-                    <p className="text-stone-600 text-sm leading-relaxed">
-                      {translation.additional}
-                    </p>
-                  </section>
-                )}
-              </div>
-
-              {/* Author Info */}
-              <div className="pt-6 border-t border-stone-100 flex items-center justify-between">
-                <Link 
-                  to={`/user/${term.created_by}`}
-                  className="flex items-center gap-3 group/author hover:bg-stone-50 p-2 -ml-2 rounded-2xl transition-all"
-                >
-                  <UserAvatar 
-                    user={{
-                      username: term.author_name,
-                      full_name: term.author_full_name,
-                      avatar: term.author_avatar
-                    }} 
-                    size="md" 
-                  />
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Автор термина</span>
-                    <span className="text-sm font-bold text-stone-900 group-hover/author:text-emerald-600 transition-colors">
-                      {term.author_full_name || term.author_name || 'Аноним'}
-                    </span>
-                  </div>
-                </Link>
-                
-                <div className="flex items-center gap-2 text-stone-400 text-[10px] font-bold uppercase tracking-widest">
-                  <User className="w-3 h-3" />
-                  <span>Класс {term.grade}</span>
+        {/* Aligned Desktop View (Both Languages) */}
+        {isBoth && (
+          <div className="hidden lg:grid grid-cols-2 gap-x-8">
+            {/* Headers */}
+            {activeLanguages.map(lang => (
+              <div key={`header-${lang.code}`} className="bg-white p-8 pb-4 rounded-t-[2.5rem] border-x border-t border-stone-200">
+                <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest">
+                  <Languages className="w-4 h-4" />
+                  <span>{lang.name}</span>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            ))}
+
+            {/* Titles */}
+            {activeLanguages.map(lang => {
+              const translation = term.translations?.find((t: any) => t.lang_code === lang.code);
+              return (
+                <div key={`title-${lang.code}`} className="bg-white px-8 pb-6 border-x border-stone-200">
+                  <h1 className="font-serif text-4xl font-black text-stone-900 leading-tight">
+                    {translation?.name}
+                  </h1>
+                </div>
+              );
+            })}
+
+            {/* Definitions */}
+            {activeLanguages.map(lang => {
+              const translation = term.translations?.find((t: any) => t.lang_code === lang.code);
+              return (
+                <div key={`def-${lang.code}`} className="bg-white px-8 pb-8 border-x border-stone-200 flex flex-col">
+                  <section className="space-y-3 flex-grow">
+                    <h3 className="flex items-center gap-2 text-stone-400 font-bold text-xs uppercase tracking-widest">
+                      <Book className="w-4 h-4" />
+                      Определение
+                    </h3>
+                    <div 
+                      className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone max-w-none"
+                      dangerouslySetInnerHTML={{ __html: translation?.definition || '' }}
+                    />
+                  </section>
+                </div>
+              );
+            })}
+
+            {/* Examples */}
+            {hasExample && activeLanguages.map(lang => {
+              const translation = term.translations?.find((t: any) => t.lang_code === lang.code);
+              return (
+                <div key={`example-${lang.code}`} className="bg-white px-8 pb-8 border-x border-stone-200">
+                  {translation?.example ? (
+                    <section className="space-y-3 p-6 bg-emerald-50 rounded-2xl border border-emerald-100 h-full">
+                      <h3 className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest">
+                        <Lightbulb className="w-4 h-4" />
+                        Пример
+                      </h3>
+                      <div 
+                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald max-w-none"
+                        dangerouslySetInnerHTML={{ __html: translation.example }}
+                      />
+                    </section>
+                  ) : (
+                    <div className="h-full" />
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Additional */}
+            {hasAdditional && activeLanguages.map(lang => {
+              const translation = term.translations?.find((t: any) => t.lang_code === lang.code);
+              return (
+                <div key={`add-${lang.code}`} className="bg-white px-8 pb-8 border-x border-stone-200">
+                  {translation?.additional ? (
+                    <section className="space-y-3">
+                      <h3 className="text-stone-400 font-bold text-xs uppercase tracking-widest">Дополнительно</h3>
+                      <p className="text-stone-600 text-sm leading-relaxed">
+                        {translation.additional}
+                      </p>
+                    </section>
+                  ) : (
+                    <div className="h-full" />
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Footers */}
+            {activeLanguages.map(lang => (
+              <div key={`footer-${lang.code}`} className="bg-white p-8 pt-6 rounded-b-[2.5rem] border-x border-b border-stone-200">
+                <div className="pt-6 border-t border-stone-100 flex items-center justify-between">
+                  <Link 
+                    to={`/user/${term.created_by}`}
+                    className="flex items-center gap-3 group/author hover:bg-stone-50 p-2 -ml-2 rounded-2xl transition-all"
+                  >
+                    <UserAvatar 
+                      user={{
+                        username: term.author_name,
+                        full_name: term.author_full_name,
+                        avatar: term.author_avatar
+                      }} 
+                      size="md" 
+                    />
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Автор термина</span>
+                      <span className="text-sm font-bold text-stone-900 group-hover/author:text-emerald-600 transition-colors">
+                        {term.author_full_name || term.author_name || 'Аноним'}
+                      </span>
+                    </div>
+                  </Link>
+                  
+                  <div className="flex items-center gap-2 text-stone-400 text-[10px] font-bold uppercase tracking-widest">
+                    <User className="w-3 h-3" />
+                    <span>Класс {term.grade}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Mobile or Single Language View */}
+        <div className={`${isBoth ? 'lg:hidden' : ''} grid grid-cols-1 gap-8`}>
+          {activeLanguages.map((lang) => {
+            const translation = term.translations?.find((t: any) => t.lang_code === lang.code);
+            if (!translation) return null;
+
+            return (
+              <div 
+                key={lang.code}
+                className={`space-y-8 p-8 bg-white rounded-3xl border border-stone-200 shadow-sm transition-all ${viewMode === lang.code ? 'lg:col-span-2' : ''}`}
+              >
+                <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest">
+                  <Languages className="w-4 h-4" />
+                  <span>{lang.name}</span>
+                </div>
+                <h1 className="font-serif text-4xl sm:text-5xl font-black text-stone-900 leading-tight">
+                  {translation.name}
+                </h1>
+                <div className="space-y-6">
+                  <section className="space-y-3">
+                    <h3 className="flex items-center gap-2 text-stone-400 font-bold text-xs uppercase tracking-widest">
+                      <Book className="w-4 h-4" />
+                      Определение
+                    </h3>
+                    <div 
+                      className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone max-w-none"
+                      dangerouslySetInnerHTML={{ __html: translation.definition }}
+                    />
+                  </section>
+                  {translation.example && (
+                    <section className="space-y-3 p-6 bg-emerald-50 rounded-2xl border border-emerald-100">
+                      <h3 className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest">
+                        <Lightbulb className="w-4 h-4" />
+                        Пример
+                      </h3>
+                      <div 
+                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald max-w-none"
+                        dangerouslySetInnerHTML={{ __html: translation.example }}
+                      />
+                    </section>
+                  )}
+                  {translation.additional && (
+                    <section className="space-y-3">
+                      <h3 className="text-stone-400 font-bold text-xs uppercase tracking-widest">Дополнительно</h3>
+                      <p className="text-stone-600 text-sm leading-relaxed">
+                        {translation.additional}
+                      </p>
+                    </section>
+                  )}
+                </div>
+
+                {/* Author Info */}
+                <div className="pt-6 border-t border-stone-100 flex items-center justify-between">
+                  <Link 
+                    to={`/user/${term.created_by}`}
+                    className="flex items-center gap-3 group/author hover:bg-stone-50 p-2 -ml-2 rounded-2xl transition-all"
+                  >
+                    <UserAvatar 
+                      user={{
+                        username: term.author_name,
+                        full_name: term.author_full_name,
+                        avatar: term.author_avatar
+                      }} 
+                      size="md" 
+                    />
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Автор термина</span>
+                      <span className="text-sm font-bold text-stone-900 group-hover/author:text-emerald-600 transition-colors">
+                        {term.author_full_name || term.author_name || 'Аноним'}
+                      </span>
+                    </div>
+                  </Link>
+                  
+                  <div className="flex items-center gap-2 text-stone-400 text-[10px] font-bold uppercase tracking-widest">
+                    <User className="w-3 h-3" />
+                    <span>Класс {term.grade}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </motion.div>
 
       <AnimatePresence>
