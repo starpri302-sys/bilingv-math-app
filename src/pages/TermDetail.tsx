@@ -91,7 +91,7 @@ export default function TermDetail() {
   );
 
   return (
-    <div className="max-w-5xl mx-auto space-y-12">
+    <div className="space-y-12">
       <SEO 
         title={term.translations?.[0]?.name || 'Термин'} 
         description={term.translations?.[0]?.definition
@@ -189,7 +189,7 @@ export default function TermDetail() {
                       Определение
                     </h3>
                     <div 
-                      className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone max-w-none"
+                      className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none"
                       dangerouslySetInnerHTML={{ __html: translation?.definition || '' }}
                     />
                   </section>
@@ -209,7 +209,7 @@ export default function TermDetail() {
                         Пример
                       </h3>
                       <div 
-                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald max-w-none"
+                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none"
                         dangerouslySetInnerHTML={{ __html: translation.example }}
                       />
                     </section>
@@ -298,7 +298,7 @@ export default function TermDetail() {
                       Определение
                     </h3>
                     <div 
-                      className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone max-w-none"
+                      className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none"
                       dangerouslySetInnerHTML={{ __html: translation.definition }}
                     />
                   </section>
@@ -309,7 +309,7 @@ export default function TermDetail() {
                         Пример
                       </h3>
                       <div 
-                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald max-w-none"
+                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none"
                         dangerouslySetInnerHTML={{ __html: translation.example }}
                       />
                     </section>
