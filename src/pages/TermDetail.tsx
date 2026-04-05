@@ -182,14 +182,14 @@ export default function TermDetail() {
             {activeLanguages.map(lang => {
               const translation = term.translations?.find((t: any) => t.lang_code === lang.code);
               return (
-                <div key={`def-${lang.code}`} className="bg-white px-8 pb-8 border-x border-stone-200 flex flex-col">
-                  <section className="space-y-3 flex-grow">
+                <div key={`def-${lang.code}`} className="bg-white px-8 pb-8 border-x border-stone-200 flex flex-col min-w-0">
+                  <section className="space-y-3 flex-grow w-full">
                     <h3 className="flex items-center gap-2 text-stone-400 font-bold text-xs uppercase tracking-widest">
                       <Book className="w-4 h-4" />
                       Определение
                     </h3>
                     <div 
-                      className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none"
+                      className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none whitespace-pre-wrap"
                       dangerouslySetInnerHTML={{ __html: translation?.definition || '' }}
                     />
                   </section>
@@ -201,15 +201,15 @@ export default function TermDetail() {
             {hasExample && activeLanguages.map(lang => {
               const translation = term.translations?.find((t: any) => t.lang_code === lang.code);
               return (
-                <div key={`example-${lang.code}`} className="bg-white px-8 pb-8 border-x border-stone-200">
+                <div key={`example-${lang.code}`} className="bg-white px-8 pb-8 border-x border-stone-200 min-w-0">
                   {translation?.example ? (
-                    <section className="space-y-3 p-6 bg-emerald-50 rounded-2xl border border-emerald-100 h-full">
+                    <section className="space-y-3 p-6 bg-emerald-50 rounded-2xl border border-emerald-100 h-full w-full">
                       <h3 className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest">
                         <Lightbulb className="w-4 h-4" />
                         Пример
                       </h3>
                       <div 
-                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none"
+                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none whitespace-pre-wrap"
                         dangerouslySetInnerHTML={{ __html: translation.example }}
                       />
                     </section>
@@ -298,7 +298,7 @@ export default function TermDetail() {
                       Определение
                     </h3>
                     <div 
-                      className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none"
+                      className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none whitespace-pre-wrap"
                       dangerouslySetInnerHTML={{ __html: translation.definition }}
                     />
                   </section>
@@ -309,7 +309,7 @@ export default function TermDetail() {
                         Пример
                       </h3>
                       <div 
-                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none"
+                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none whitespace-pre-wrap"
                         dangerouslySetInnerHTML={{ __html: translation.example }}
                       />
                     </section>

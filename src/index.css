@@ -2,6 +2,13 @@
 @plugin "@tailwindcss/typography";
 
 @layer base {
+  .prose {
+    @apply max-w-none;
+    hyphens: none;
+  }
+  .prose p, .prose ul, .prose ol, .prose blockquote {
+    @apply max-w-none;
+  }
   .prose img {
     @apply rounded-2xl shadow-sm my-4 max-w-full h-auto;
   }
