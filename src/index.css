@@ -3,11 +3,13 @@
 
 @layer base {
   .prose {
-    @apply max-w-none;
+    @apply max-w-none w-full;
     hyphens: none;
+    word-break: normal;
+    overflow-wrap: normal;
   }
   .prose p, .prose ul, .prose ol, .prose blockquote {
-    @apply max-w-none;
+    @apply max-w-none w-full;
   }
   .prose img {
     @apply rounded-2xl shadow-sm my-4 max-w-full h-auto;
