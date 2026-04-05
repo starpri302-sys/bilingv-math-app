@@ -83,6 +83,14 @@ export default function TermDetail() {
 
   const activeLanguages = languages.filter(lang => viewMode === 'both' || viewMode === lang.code);
   const isBoth = viewMode === 'both';
+
+  const formatHtml = (html: string) => {
+    if (!html) return '';
+    // Replace space before any kind of dash with a non-breaking space
+    // This "glues" the dash to the previous word
+    return html.replace(/ (\-|–|—) /g, '&nbsp;$1 ');
+  };
+
   const hasExample = activeLanguages.some(lang => 
     term.translations?.find((t: any) => t.lang_code === lang.code)?.example
   );
@@ -190,7 +198,7 @@ export default function TermDetail() {
                     </h3>
                     <div 
                       className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full"
-                      dangerouslySetInnerHTML={{ __html: translation?.definition || '' }}
+                      dangerouslySetInnerHTML={{ __html: formatHtml(translation?.definition || '') }}
                     />
                   </section>
                 </div>
@@ -210,7 +218,7 @@ export default function TermDetail() {
                       </h3>
                       <div 
                         className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full"
-                        dangerouslySetInnerHTML={{ __html: translation.example }}
+                        dangerouslySetInnerHTML={{ __html: formatHtml(translation.example) }}
                       />
                     </section>
                   ) : (
@@ -299,7 +307,7 @@ export default function TermDetail() {
                     </h3>
                     <div 
                       className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full"
-                      dangerouslySetInnerHTML={{ __html: translation.definition }}
+                      dangerouslySetInnerHTML={{ __html: formatHtml(translation.definition) }}
                     />
                   </section>
                   {translation.example && (
@@ -310,7 +318,7 @@ export default function TermDetail() {
                       </h3>
                       <div 
                         className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full"
-                        dangerouslySetInnerHTML={{ __html: translation.example }}
+                        dangerouslySetInnerHTML={{ __html: formatHtml(translation.example) }}
                       />
                     </section>
                   )}
