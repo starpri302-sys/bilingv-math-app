@@ -49,7 +49,7 @@ export default function TermCard({ term, language }: TermCardProps) {
       </div>
 
       <Link to={`/term/${term.id}`} className="block flex-grow">
-        <h3 className="font-serif text-2xl font-bold text-stone-900 mb-3 group-hover:text-emerald-600 transition-colors">
+        <h3 className="font-serif text-2xl font-bold text-stone-900 mb-3 group-hover:text-emerald-600 transition-colors break-words">
           {name}
         </h3>
         

@@ -110,7 +110,7 @@ export default function TermDetail() {
         <div className="flex items-center gap-4">
           <Link to="/" className="flex items-center gap-2 text-stone-500 hover:text-emerald-600 transition-colors font-bold text-sm uppercase tracking-widest">
             <ArrowLeft className="w-5 h-5" />
-            Назад к списку
+            Назад
           </Link>
           {canEdit && (
             <div className="flex items-center gap-4">
@@ -119,7 +119,7 @@ export default function TermDetail() {
                 className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 transition-colors font-bold text-sm uppercase tracking-widest"
               >
                 <Edit3 className="w-4 h-4" />
-                Редактировать
+                Изменить
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(true)}
@@ -147,6 +147,60 @@ export default function TermDetail() {
           >
             Оба
           </button>
+        </div>
+      </div>
+
+      {/* New Header Section: Author, Subject, Grade */}
+      <div className="bg-white rounded-[2.5rem] p-6 sm:p-8 border border-stone-200 shadow-sm space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+          <Link 
+            to={`/user/${term.created_by}`}
+            className="flex items-center gap-4 group/author hover:bg-stone-50 p-2 -ml-2 rounded-3xl transition-all"
+          >
+            <UserAvatar 
+              user={{
+                username: term.author_name,
+                full_name: term.author_full_name,
+                avatar: term.author_avatar
+              }} 
+              size="lg" 
+            />
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Автор термина</span>
+              <span className="text-lg font-bold text-stone-900 group-hover/author:text-emerald-600 transition-colors leading-tight">
+                {term.author_full_name || term.author_name || 'Аноним'}
+              </span>
+            </div>
+          </Link>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 px-4 py-2 bg-stone-100 text-stone-600 rounded-2xl text-xs font-bold uppercase tracking-widest border border-stone-200">
+              <Book className="w-4 h-4 text-emerald-600" />
+              <span>{term.subject_name_ru || 'Математика'}</span>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 bg-stone-100 text-stone-600 rounded-2xl text-xs font-bold uppercase tracking-widest border border-stone-200">
+              <User className="w-4 h-4 text-emerald-600" />
+              <span>Класс {term.grade}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Language Indicator Badge */}
+        <div className="pt-6 border-t border-stone-100 flex items-center gap-3">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Доступные языки:</span>
+          <div className="flex gap-2">
+            {term.translations?.map((t: any) => {
+              const lang = languages.find(l => l.code === t.lang_code);
+              return (
+                <span 
+                  key={t.lang_code}
+                  className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[10px] font-black uppercase tracking-wider border border-emerald-100"
+                >
+                  {lang?.name || t.lang_code}
+                </span>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -240,35 +294,10 @@ export default function TermDetail() {
               );
             })}
 
-            {/* Footers */}
+            {/* Footers (Simplified) */}
             {activeLanguages.map(lang => (
-              <div key={`footer-${lang.code}`} className="bg-white p-6 pt-6 rounded-b-[2.5rem] border-x border-b border-stone-200">
-                <div className="pt-6 border-t border-stone-100 flex items-center justify-between">
-                  <Link 
-                    to={`/user/${term.created_by}`}
-                    className="flex items-center gap-3 group/author hover:bg-stone-50 p-2 -ml-2 rounded-2xl transition-all"
-                  >
-                    <UserAvatar 
-                      user={{
-                        username: term.author_name,
-                        full_name: term.author_full_name,
-                        avatar: term.author_avatar
-                      }} 
-                      size="md" 
-                    />
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Автор термина</span>
-                      <span className="text-sm font-bold text-stone-900 group-hover/author:text-emerald-600 transition-colors">
-                        {term.author_full_name || term.author_name || 'Аноним'}
-                      </span>
-                    </div>
-                  </Link>
-                  
-                  <div className="flex items-center gap-2 text-stone-400 text-[10px] font-bold uppercase tracking-widest">
-                    <User className="w-3 h-3" />
-                    <span>Класс {term.grade}</span>
-                  </div>
-                </div>
+              <div key={`footer-${lang.code}`} className="bg-white p-6 pt-2 rounded-b-[2.5rem] border-x border-b border-stone-200">
+                {/* Empty footer space to maintain the rounded bottom look */}
               </div>
             ))}
           </div>
@@ -283,13 +312,13 @@ export default function TermDetail() {
             return (
               <div 
                 key={lang.code}
-                className={`space-y-8 p-8 bg-white rounded-3xl border border-stone-200 shadow-sm transition-all ${viewMode === lang.code ? 'lg:col-span-2' : ''}`}
+                className={`space-y-8 p-5 sm:p-8 bg-white rounded-3xl border border-stone-200 shadow-sm transition-all ${viewMode === lang.code ? 'lg:col-span-2' : ''}`}
               >
                 <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest">
                   <Languages className="w-4 h-4" />
                   <span>{lang.name}</span>
                 </div>
-                <h1 className="font-serif text-4xl sm:text-5xl font-black text-stone-900 leading-tight">
+                <h1 className="font-serif text-3xl sm:text-5xl font-black text-stone-900 leading-tight break-words">
                   {translation.name}
                 </h1>
                 <div className="space-y-6">
@@ -304,7 +333,7 @@ export default function TermDetail() {
                     />
                   </section>
                   {translation.example && (
-                    <section className="space-y-3 p-6 bg-emerald-50 rounded-2xl border border-emerald-100">
+                    <section className="space-y-3 p-4 sm:p-6 bg-emerald-50 rounded-2xl border border-emerald-100">
                       <h3 className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest">
                         <Lightbulb className="w-4 h-4" />
                         Пример
@@ -318,39 +347,11 @@ export default function TermDetail() {
                   {translation.additional && (
                     <section className="space-y-3">
                       <h3 className="text-stone-400 font-bold text-xs uppercase tracking-widest">Дополнительно</h3>
-                      <p className="text-stone-600 text-sm leading-relaxed">
+                      <p className="text-stone-600 text-sm leading-relaxed break-words">
                         {translation.additional}
                       </p>
                     </section>
                   )}
-                </div>
-
-                {/* Author Info */}
-                <div className="pt-6 border-t border-stone-100 flex items-center justify-between">
-                  <Link 
-                    to={`/user/${term.created_by}`}
-                    className="flex items-center gap-3 group/author hover:bg-stone-50 p-2 -ml-2 rounded-2xl transition-all"
-                  >
-                    <UserAvatar 
-                      user={{
-                        username: term.author_name,
-                        full_name: term.author_full_name,
-                        avatar: term.author_avatar
-                      }} 
-                      size="md" 
-                    />
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Автор термина</span>
-                      <span className="text-sm font-bold text-stone-900 group-hover/author:text-emerald-600 transition-colors">
-                        {term.author_full_name || term.author_name || 'Аноним'}
-                      </span>
-                    </div>
-                  </Link>
-                  
-                  <div className="flex items-center gap-2 text-stone-400 text-[10px] font-bold uppercase tracking-widest">
-                    <User className="w-3 h-3" />
-                    <span>Класс {term.grade}</span>
-                  </div>
                 </div>
               </div>
             );

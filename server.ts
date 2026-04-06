@@ -927,9 +927,12 @@ async function startServer() {
   app.get("/api/terms/:id", async (req, res) => {
     try {
       const termRes = await pool.query(`
-        SELECT t.*, u.username as author_name, u.avatar as author_avatar, u.full_name as author_full_name
+        SELECT t.*, 
+               u.username as author_name, u.avatar as author_avatar, u.full_name as author_full_name,
+               s.name_ru as subject_name_ru, s.name_tyv as subject_name_tyv
         FROM terms t
         LEFT JOIN users u ON t.created_by = u.id
+        LEFT JOIN subjects s ON t.subject_id = s.id
         WHERE t.id = $1
       `, [req.params.id]);
       const term = termRes.rows[0];

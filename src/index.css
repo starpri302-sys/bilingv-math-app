@@ -3,7 +3,8 @@
 
 @layer base {
   .prose {
-    @apply max-w-none w-full;
+    @apply max-w-none w-full break-words;
+    overflow-wrap: break-word;
   }
   .prose p, .prose ul, .prose ol, .prose blockquote {
     @apply max-w-none w-full;

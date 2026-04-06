@@ -86,8 +86,8 @@ export default function Home() {
   return (
     <div className="space-y-12">
       <SEO />
-      <header className="text-center space-y-4 max-w-3xl mx-auto">
-        <h1 className="font-serif text-5xl sm:text-6xl font-black text-stone-900 leading-tight tracking-tight">
+      <header className="text-center space-y-4 max-w-3xl mx-auto px-4">
+        <h1 className="font-serif text-4xl sm:text-6xl font-black text-stone-900 leading-tight tracking-tight break-words">
           Билингвальный справочник <span className="text-emerald-600 italic">по математике</span>
         </h1>
         <p className="text-stone-500 text-lg sm:text-xl font-medium max-w-2xl mx-auto leading-relaxed">
