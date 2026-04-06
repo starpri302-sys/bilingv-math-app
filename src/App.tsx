@@ -25,7 +25,7 @@ export default function App() {
       <Router>
         <div className="min-h-screen bg-stone-50 text-stone-900 font-sans flex flex-col">
           <Navbar />
-          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
+          <main className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/term/:id" element={<TermDetail />} />

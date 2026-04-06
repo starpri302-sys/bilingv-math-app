@@ -156,10 +156,10 @@ export default function TermDetail() {
       >
         {/* Aligned Desktop View (Both Languages) */}
         {isBoth && (
-          <div className="hidden lg:grid grid-cols-2 gap-x-8">
+          <div className="hidden lg:grid grid-cols-2 gap-x-4">
             {/* Headers */}
             {activeLanguages.map(lang => (
-              <div key={`header-${lang.code}`} className="bg-white p-8 pb-4 rounded-t-[2.5rem] border-x border-t border-stone-200">
+              <div key={`header-${lang.code}`} className="bg-white p-6 pb-4 rounded-t-[2.5rem] border-x border-t border-stone-200">
                 <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest">
                   <Languages className="w-4 h-4" />
                   <span>{lang.name}</span>
@@ -171,7 +171,7 @@ export default function TermDetail() {
             {activeLanguages.map(lang => {
               const translation = term.translations?.find((t: any) => t.lang_code === lang.code);
               return (
-                <div key={`title-${lang.code}`} className="bg-white px-8 pb-6 border-x border-stone-200">
+                <div key={`title-${lang.code}`} className="bg-white px-6 pb-6 border-x border-stone-200">
                   <h1 className="font-serif text-4xl font-black text-stone-900 leading-tight">
                     {translation?.name}
                   </h1>
@@ -183,7 +183,7 @@ export default function TermDetail() {
             {activeLanguages.map(lang => {
               const translation = term.translations?.find((t: any) => t.lang_code === lang.code);
               return (
-                <div key={`def-${lang.code}`} className="bg-white px-6 pb-8 border-x border-stone-200 flex flex-col min-w-0">
+                <div key={`def-${lang.code}`} className="bg-white px-4 pb-8 border-x border-stone-200 flex flex-col min-w-0">
                   <section className="space-y-3 flex-grow w-full">
                     <h3 className="flex items-center gap-2 text-stone-400 font-bold text-xs uppercase tracking-widest">
                       <Book className="w-4 h-4" />
@@ -202,7 +202,7 @@ export default function TermDetail() {
             {hasExample && activeLanguages.map(lang => {
               const translation = term.translations?.find((t: any) => t.lang_code === lang.code);
               return (
-                <div key={`example-${lang.code}`} className="bg-white px-6 pb-8 border-x border-stone-200 min-w-0">
+                <div key={`example-${lang.code}`} className="bg-white px-4 pb-8 border-x border-stone-200 min-w-0">
                   {translation?.example ? (
                     <section className="space-y-3 p-6 bg-emerald-50 rounded-2xl border border-emerald-100 h-full w-full">
                       <h3 className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest">
@@ -225,7 +225,7 @@ export default function TermDetail() {
             {hasAdditional && activeLanguages.map(lang => {
               const translation = term.translations?.find((t: any) => t.lang_code === lang.code);
               return (
-                <div key={`add-${lang.code}`} className="bg-white px-8 pb-8 border-x border-stone-200">
+                <div key={`add-${lang.code}`} className="bg-white px-6 pb-8 border-x border-stone-200">
                   {translation?.additional ? (
                     <section className="space-y-3">
                       <h3 className="text-stone-400 font-bold text-xs uppercase tracking-widest">Дополнительно</h3>
@@ -242,7 +242,7 @@ export default function TermDetail() {
 
             {/* Footers */}
             {activeLanguages.map(lang => (
-              <div key={`footer-${lang.code}`} className="bg-white p-8 pt-6 rounded-b-[2.5rem] border-x border-b border-stone-200">
+              <div key={`footer-${lang.code}`} className="bg-white p-6 pt-6 rounded-b-[2.5rem] border-x border-b border-stone-200">
                 <div className="pt-6 border-t border-stone-100 flex items-center justify-between">
                   <Link 
                     to={`/user/${term.created_by}`}
