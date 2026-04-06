@@ -579,21 +579,36 @@ async function startServer() {
 
   // Users API
   app.get("/api/users/:id", async (req, res) => {
-    const userRes = await pool.query("SELECT id, username, full_name, school, grade, avatar, role, contact_info, bio FROM users WHERE id = $1", [req.params.id]);
-    res.json(userRes.rows[0] || null);
+    try {
+      const userRes = await pool.query("SELECT id, username, full_name, school, grade, avatar, role, contact_info, bio FROM users WHERE id = $1", [req.params.id]);
+      res.json(userRes.rows[0] || null);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
   });
 
   app.get("/api/admin/users", async (req, res) => {
-    const usersRes = await pool.query("SELECT * FROM users ORDER BY created_at DESC");
-    res.json(usersRes.rows);
+    try {
+      const usersRes = await pool.query("SELECT * FROM users ORDER BY created_at DESC");
+      res.json(usersRes.rows);
+    } catch (error) {
+      console.error('Error fetching all users:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
   });
 
   // System Admin Endpoints
   app.get("/api/admin/logs", async (req, res) => {
-    const { user_role } = req.query;
-    if (user_role !== 'super_admin') return res.status(403).json({ error: "Forbidden" });
-    const logsRes = await pool.query("SELECT * FROM logs ORDER BY created_at DESC LIMIT 500");
-    res.json(logsRes.rows);
+    try {
+      const { user_role } = req.query;
+      if (user_role !== 'super_admin') return res.status(403).json({ error: "Forbidden" });
+      const logsRes = await pool.query("SELECT * FROM logs ORDER BY created_at DESC LIMIT 500");
+      res.json(logsRes.rows);
+    } catch (error) {
+      console.error('Error fetching logs:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
   });
 
   app.get("/api/admin/backup", async (req, res) => {
@@ -908,13 +923,22 @@ async function startServer() {
       }
       query += " ORDER BY t.created_at DESC";
       const termsRes = await pool.query(query, params);
-      const terms = termsRes.rows;
+      const terms = termsRes.rows.slice(0, 100);
       
-      // Optimization: Fetch all translations in one query if possible, 
-      // but for now let's just keep it simple and add a limit to avoid overload
-      const termsWithTranslations = await Promise.all(terms.slice(0, 100).map(async (term) => {
-        const transRes = await pool.query("SELECT * FROM term_translations WHERE term_id = $1", [term.id]);
-        return { ...term, translations: transRes.rows };
+      if (terms.length === 0) {
+        return res.json([]);
+      }
+
+      const termIds = terms.map(t => t.id);
+      const placeholders = termIds.map((_, i) => `$${i + 1}`).join(',');
+      const transRes = await pool.query(
+        `SELECT * FROM term_translations WHERE term_id IN (${placeholders})`, 
+        termIds
+      );
+      
+      const termsWithTranslations = terms.map(term => ({
+        ...term,
+        translations: transRes.rows.filter(tr => tr.term_id === term.id)
       }));
       
       res.json(termsWithTranslations);
@@ -1168,6 +1192,11 @@ async function startServer() {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error('Global error handler:', err);
+    res.status(500).json({ error: "Internal server error" });
+  });
 
   httpServer.listen(finalPort, "0.0.0.0", () => {
     console.log(`>>> Server is listening on port ${finalPort}`);
