@@ -191,11 +191,11 @@ export const api = {
     });
     return handleResponse(res);
   },
-  async resetPassword(token: string, password: any) {
+  async resetPassword(email: string, token: string, newPassword: any) {
     const res = await fetch('/api/auth/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, password })
+      body: JSON.stringify({ email, token, newPassword })
     });
     return handleResponse(res);
   },
@@ -227,6 +227,25 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_role: userRole, data })
+    });
+    return handleResponse(res);
+  },
+  async getFavorites() {
+    const res = await fetch('/api/favorites', {
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
+  async toggleFavorite(termId: string, isFavorite: boolean) {
+    const res = await fetch(`/api/favorites/${termId}`, {
+      method: isFavorite ? 'DELETE' : 'POST',
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
+  async getFavoriteStatus(termId: string) {
+    const res = await fetch(`/api/favorites/${termId}/status`, {
+      headers: getAuthHeader()
     });
     return handleResponse(res);
   }

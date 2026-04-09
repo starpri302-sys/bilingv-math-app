@@ -1,7 +1,10 @@
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Book, ChevronRight, User } from 'lucide-react';
+import { Book, ChevronRight, User, Heart } from 'lucide-react';
 import UserAvatar from './UserAvatar';
+import { api } from '../services/api';
+import { useAuth } from '../store/authContext';
 
 interface TermCardProps {
   term: any;
@@ -9,6 +12,32 @@ interface TermCardProps {
 }
 
 export default function TermCard({ term, language }: TermCardProps) {
+  const { user } = useAuth();
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      api.getFavoriteStatus(term.id).then(res => setIsFavorite(res.isFavorite));
+    }
+  }, [term.id, user]);
+
+  const handleToggleFavorite = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user || isToggling) return;
+
+    setIsToggling(true);
+    try {
+      await api.toggleFavorite(term.id, isFavorite);
+      setIsFavorite(!isFavorite);
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
   const translation = term.translations?.find((t: any) => t.lang_code === language) || term.translations?.[0] || {};
   const name = translation.name || 'No Name';
   const rawDefinition = translation.definition || '';
@@ -51,9 +80,21 @@ export default function TermCard({ term, language }: TermCardProps) {
               </span>
             </div>
           </Link>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-stone-100 text-stone-600 rounded-xl text-[10px] font-bold uppercase tracking-widest border border-stone-200 shrink-0">
-            <Book className="w-3 h-3 text-emerald-600" />
-            <span>Класс {term.grade}</span>
+          <div className="flex items-center gap-2">
+            {user && (
+              <button
+                onClick={handleToggleFavorite}
+                disabled={isToggling}
+                className={`p-2 rounded-xl transition-all ${isFavorite ? 'bg-red-50 text-red-500' : 'bg-stone-100 text-stone-400 hover:text-red-400 hover:bg-red-50'}`}
+                title={isFavorite ? 'Удалить из избранного' : 'Добавить в избранное'}
+              >
+                <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
+              </button>
+            )}
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-stone-100 text-stone-600 rounded-xl text-[10px] font-bold uppercase tracking-widest border border-stone-200 shrink-0">
+              <Book className="w-3 h-3 text-emerald-600" />
+              <span>Класс {term.grade}</span>
+            </div>
           </div>
         </div>
 

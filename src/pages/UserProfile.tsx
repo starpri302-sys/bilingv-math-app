@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../services/api';
+import { useAuth } from '../store/authContext';
 import { motion } from 'motion/react';
-import { User, School, GraduationCap, BookOpen, Mail, ShieldCheck } from 'lucide-react';
+import { User, School, GraduationCap, BookOpen, Mail, ShieldCheck, LogIn } from 'lucide-react';
 import UserAvatar from '../components/UserAvatar';
 import TermCard from '../components/TermCard';
 
 export default function UserProfile() {
   const { id } = useParams<{ id: string }>();
+  const { user: currentUser, loading: authLoading } = useAuth();
   const [user, setUser] = useState<any>(null);
   const [terms, setTerms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -15,7 +17,7 @@ export default function UserProfile() {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      if (!id) return;
+      if (!id || !currentUser) return;
       try {
         setLoading(true);
         const [userData, userTerms] = await Promise.all([
@@ -32,13 +34,53 @@ export default function UserProfile() {
       }
     };
 
-    fetchUserData();
-  }, [id]);
+    if (!authLoading) {
+      fetchUserData();
+    }
+  }, [id, currentUser, authLoading]);
 
-  if (loading) {
+  if (authLoading || (loading && currentUser)) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-20 px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white p-8 sm:p-12 rounded-[2.5rem] border border-stone-200 shadow-xl space-y-8"
+        >
+          <div className="w-24 h-24 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto">
+            <User className="w-12 h-12" />
+          </div>
+          <div className="space-y-4">
+            <h2 className="text-3xl font-serif font-black text-stone-900">Профиль автора</h2>
+            <p className="text-stone-500 text-lg font-medium leading-relaxed">
+              Просмотр профилей авторов доступен только зарегистрированным пользователям. 
+              Присоединяйтесь к нашему сообществу, чтобы видеть достижения других и делиться своими знаниями!
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+            <Link 
+              to="/login" 
+              className="flex items-center justify-center gap-2 bg-stone-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-stone-800 transition-all shadow-lg"
+            >
+              <LogIn className="w-5 h-5" />
+              Войти
+            </Link>
+            <Link 
+              to="/register" 
+              className="flex items-center justify-center gap-2 bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg"
+            >
+              Зарегистрироваться
+            </Link>
+          </div>
+        </motion.div>
       </div>
     );
   }

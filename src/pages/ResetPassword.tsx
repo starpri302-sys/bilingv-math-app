@@ -8,6 +8,7 @@ export default function ResetPassword() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get('token');
+  const email = searchParams.get('email');
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -17,14 +18,14 @@ export default function ResetPassword() {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    if (!token) {
-      setMessage('Ошибка: Токен сброса пароля отсутствует.');
+    if (!token || !email) {
+      setMessage('Ошибка: Токен или email сброса пароля отсутствует.');
     }
-  }, [token]);
+  }, [token, email]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
+    if (!token || !email) return;
 
     if (password !== confirmPassword) {
       setMessage('Ошибка: Пароли не совпадают');
@@ -39,7 +40,7 @@ export default function ResetPassword() {
     setLoading(true);
     setMessage('');
     try {
-      const res = await api.resetPassword(token, password);
+      const res = await api.resetPassword(email, token, password);
       if (res.success) {
         setSuccess(true);
         setTimeout(() => navigate('/login'), 5000);

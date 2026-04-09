@@ -37,7 +37,7 @@ export default function Comments({ termId }: CommentsProps) {
 
     try {
       await api.addComment(termId, {
-        user_id: user.uid,
+        user_id: user.id,
         username: profile?.username || user.username,
         avatar: profile?.avatar || '',
         content: newComment

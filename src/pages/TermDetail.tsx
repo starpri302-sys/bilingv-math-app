@@ -6,7 +6,7 @@ import SEO from '../components/SEO';
 import UserAvatar from '../components/UserAvatar';
 import { useAuth } from '../store/authContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Book, Info, Lightbulb, Share2, Languages, Edit3, Trash2, User } from 'lucide-react';
+import { ArrowLeft, Book, Info, Lightbulb, Share2, Languages, Edit3, Trash2, User, Heart } from 'lucide-react';
 
 export default function TermDetail() {
   const { id } = useParams<{ id: string }>();
@@ -18,13 +18,16 @@ export default function TermDetail() {
   const [viewMode, setViewMode] = useState<string>('both');
   const [showEditor, setShowEditor] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
 
   const fetchData = async () => {
     if (!id) return;
     try {
-      const [termData, langData] = await Promise.all([
+      const [termData, langData, favStatus] = await Promise.all([
         api.getTerm(id),
-        api.getLanguages()
+        api.getLanguages(),
+        user ? api.getFavoriteStatus(id) : Promise.resolve({ isFavorite: false })
       ]);
       
       if (termData && !termData.error) {
@@ -40,6 +43,8 @@ export default function TermDetail() {
         console.error('Languages data is not an array:', langData);
         setLanguages([]);
       }
+
+      setIsFavorite(favStatus.isFavorite);
     } catch (error) {
       console.error('Error fetching data:', error);
       setTerm(null);
@@ -50,9 +55,22 @@ export default function TermDetail() {
 
   useEffect(() => {
     fetchData();
-  }, [id]);
+  }, [id, user]);
 
-  const canEdit = isAdmin || (user && term && user.uid === term.created_by);
+  const toggleFavorite = async () => {
+    if (!user || isToggling) return;
+    setIsToggling(true);
+    try {
+      await api.toggleFavorite(id!, isFavorite);
+      setIsFavorite(!isFavorite);
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
+  const canEdit = isAdmin || (user && term && user.id === term.created_by);
 
   const handleDelete = async () => {
     try {
@@ -112,6 +130,16 @@ export default function TermDetail() {
             <ArrowLeft className="w-5 h-5" />
             Назад
           </Link>
+          {user && (
+            <button
+              onClick={toggleFavorite}
+              disabled={isToggling}
+              className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all ${isFavorite ? 'bg-red-50 text-red-500' : 'bg-stone-100 text-stone-500 hover:bg-red-50 hover:text-red-500'}`}
+            >
+              <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
+              {isFavorite ? 'В избранном' : 'В избранное'}
+            </button>
+          )}
           {canEdit && (
             <div className="flex items-center gap-4">
               <button

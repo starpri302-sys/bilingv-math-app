@@ -211,6 +211,13 @@ async function initDb(forceReinstall = false) {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS favorites (
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        term_id TEXT REFERENCES terms(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY(user_id, term_id)
+      );
+
       CREATE TABLE IF NOT EXISTS password_resets (
         email TEXT PRIMARY KEY,
         token TEXT,
@@ -456,7 +463,7 @@ async function startServer() {
         ON CONFLICT (email) DO UPDATE SET token = EXCLUDED.token, expires = EXCLUDED.expires
       `, [email, token, expires]);
 
-      const resetUrl = `${process.env.APP_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
+      const resetUrl = `${process.env.APP_URL || 'http://localhost:3000'}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
       
       console.log(`PASSWORD RESET TOKEN FOR ${email}: ${token}`);
       console.log(`RESET URL: ${resetUrl}`);
@@ -1116,6 +1123,7 @@ async function startServer() {
     try {
       await client.query("BEGIN");
       await client.query("DELETE FROM comments WHERE term_id = $1", [req.params.id]);
+      await client.query("DELETE FROM favorites WHERE term_id = $1", [req.params.id]);
       await client.query("DELETE FROM term_versions WHERE term_id = $1", [req.params.id]);
       await client.query("DELETE FROM term_translations WHERE term_id = $1", [req.params.id]);
       await client.query("DELETE FROM terms WHERE id = $1", [req.params.id]);
@@ -1127,6 +1135,94 @@ async function startServer() {
       res.status(500).json({ error: "Failed to delete term" });
     } finally {
       client.release();
+    }
+  });
+
+  // Favorites API
+  app.get("/api/favorites", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "No token provided" });
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      const favoritesRes = await pool.query(`
+        SELECT t.*, u.username as author_name, u.avatar as author_avatar, u.full_name as author_full_name
+        FROM favorites f
+        JOIN terms t ON f.term_id = t.id
+        LEFT JOIN users u ON t.created_by = u.id
+        WHERE f.user_id = $1
+        ORDER BY f.created_at DESC
+      `, [decoded.id]);
+      
+      const terms = favoritesRes.rows;
+      if (terms.length === 0) return res.json([]);
+
+      const termIds = terms.map(t => t.id);
+      const placeholders = termIds.map((_, i) => `$${i + 1}`).join(',');
+      const transRes = await pool.query(
+        `SELECT * FROM term_translations WHERE term_id IN (${placeholders})`, 
+        termIds
+      );
+      
+      const termsWithTranslations = terms.map(term => ({
+        ...term,
+        translations: transRes.rows.filter(tr => tr.term_id === term.id)
+      }));
+      
+      res.json(termsWithTranslations);
+    } catch (error) {
+      res.status(401).json({ error: "Invalid token" });
+    }
+  });
+
+  app.post("/api/favorites/:termId", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "No token provided" });
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      const { termId } = req.params;
+      await pool.query(
+        "INSERT INTO favorites (user_id, term_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        [decoded.id, termId]
+      );
+      res.json({ success: true });
+    } catch (error) {
+      res.status(401).json({ error: "Invalid token" });
+    }
+  });
+
+  app.delete("/api/favorites/:termId", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "No token provided" });
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      const { termId } = req.params;
+      await pool.query(
+        "DELETE FROM favorites WHERE user_id = $1 AND term_id = $2",
+        [decoded.id, termId]
+      );
+      res.json({ success: true });
+    } catch (error) {
+      res.status(401).json({ error: "Invalid token" });
+    }
+  });
+
+  app.get("/api/favorites/:termId/status", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.json({ isFavorite: false });
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      const { termId } = req.params;
+      const favRes = await pool.query(
+        "SELECT 1 FROM favorites WHERE user_id = $1 AND term_id = $2",
+        [decoded.id, termId]
+      );
+      res.json({ isFavorite: favRes.rowCount > 0 });
+    } catch (error) {
+      res.json({ isFavorite: false });
     }
   });
 
