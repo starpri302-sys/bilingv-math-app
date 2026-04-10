@@ -596,9 +596,9 @@ async function startServer() {
       }
       console.log(`GET /api/users/${id} - User found: ${userRes.rows[0].username}`);
       res.json(userRes.rows[0]);
-    } catch (error) {
+    } catch (error: any) {
       console.error(`GET /api/users/${id} - Error:`, error);
-      res.status(500).json({ error: "Internal server error" });
+      res.status(500).json({ error: "Internal server error", message: error.message });
     }
   });
 
@@ -957,9 +957,9 @@ async function startServer() {
       }));
       
       res.json(termsWithTranslations);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching terms:', error);
-      res.status(500).json({ error: "Internal server error" });
+      res.status(500).json({ error: "Internal server error", message: error.message });
     }
   });
 

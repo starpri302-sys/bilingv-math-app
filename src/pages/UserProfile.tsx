@@ -35,6 +35,8 @@ export default function UserProfile() {
         // Fetch user data first
         let userData;
         try {
+          const fetchUrl = `/api/users/${id}`;
+          console.log(`UserProfile: Fetching user data from ${fetchUrl}`);
           userData = await api.getUsers(id);
           console.log('UserProfile: User data received:', userData);
         } catch (userErr: any) {
