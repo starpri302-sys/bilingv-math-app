@@ -586,11 +586,18 @@ async function startServer() {
 
   // Users API
   app.get("/api/users/:id", async (req, res) => {
+    const { id } = req.params;
+    console.log(`GET /api/users/${id} - Fetching user profile`);
     try {
-      const userRes = await pool.query("SELECT id, username, full_name, school, grade, avatar, role, contact_info, bio FROM users WHERE id = $1", [req.params.id]);
-      res.json(userRes.rows[0] || null);
+      const userRes = await pool.query("SELECT id, username, full_name, school, grade, avatar, role, contact_info, bio FROM users WHERE id = $1", [id]);
+      if (userRes.rows.length === 0) {
+        console.log(`GET /api/users/${id} - User not found`);
+        return res.json(null);
+      }
+      console.log(`GET /api/users/${id} - User found: ${userRes.rows[0].username}`);
+      res.json(userRes.rows[0]);
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      console.error(`GET /api/users/${id} - Error:`, error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -904,6 +911,7 @@ async function startServer() {
   app.get("/api/terms", async (req, res) => {
     try {
       const { status, subjectId, grade, createdBy } = req.query;
+      console.log(`GET /api/terms - Filters: status=${status}, subjectId=${subjectId}, grade=${grade}, createdBy=${createdBy}`);
       let query = `
         SELECT t.*, u.username as author_name, u.avatar as author_avatar, u.full_name as author_full_name
         FROM terms t

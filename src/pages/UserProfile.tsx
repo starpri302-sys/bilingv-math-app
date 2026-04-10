@@ -17,18 +17,52 @@ export default function UserProfile() {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      if (!id || !currentUser) return;
+      if (!id) {
+        console.warn('UserProfile: No ID provided in URL');
+        return;
+      }
+      
+      if (!currentUser) {
+        console.log('UserProfile: No current user, waiting for auth...');
+        return;
+      }
+
       try {
         setLoading(true);
-        const [userData, userTerms] = await Promise.all([
-          api.getUsers(id),
-          api.getTerms({ createdBy: id, status: 'published' })
-        ]);
+        setError('');
+        console.log(`UserProfile: Fetching data for user ID: ${id}`);
+
+        // Fetch user data first
+        let userData;
+        try {
+          userData = await api.getUsers(id);
+          console.log('UserProfile: User data received:', userData);
+        } catch (userErr: any) {
+          console.error('UserProfile: Failed to fetch user data:', userErr);
+          throw new Error(`Ошибка загрузки данных пользователя: ${userErr.message}`);
+        }
+
+        if (!userData) {
+          setError('Пользователь не найден');
+          setLoading(false);
+          return;
+        }
+
         setUser(userData);
-        setTerms(userTerms);
-      } catch (err) {
-        console.error('Error fetching user profile:', err);
-        setError('Не удалось загрузить профиль пользователя');
+
+        // Fetch terms separately so one failure doesn't block the other
+        try {
+          const userTerms = await api.getTerms({ createdBy: id, status: 'published' });
+          console.log(`UserProfile: Found ${userTerms.length} terms for user`);
+          setTerms(userTerms);
+        } catch (termsErr) {
+          console.error('UserProfile: Failed to fetch user terms:', termsErr);
+          // Don't throw here, just show empty terms or a warning
+        }
+
+      } catch (err: any) {
+        console.error('UserProfile: General error:', err);
+        setError(err.message || 'Не удалось загрузить профиль пользователя');
       } finally {
         setLoading(false);
       }
@@ -119,10 +153,15 @@ export default function UserProfile() {
                 <h1 className="text-4xl font-serif font-black text-stone-900">
                   {user.full_name || user.username}
                 </h1>
-                {user.role === 'super_admin' && (
-                  <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full flex items-center gap-1">
+                {(user.role === 'super_admin' || user.role === 'chief_editor') && (
+                  <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full flex items-center gap-1 border border-emerald-200">
                     <ShieldCheck className="w-3 h-3" />
-                    Админ
+                    {user.role === 'super_admin' ? 'Супер-админ' : 'Админ'}
+                  </span>
+                )}
+                {user.role === 'editor' && (
+                  <span className="bg-blue-100 text-blue-700 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-blue-200">
+                    Редактор
                   </span>
                 )}
               </div>
