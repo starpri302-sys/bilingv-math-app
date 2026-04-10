@@ -63,72 +63,75 @@ export default function TermCard({ term, language }: TermCardProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -4 }}
-      className="bg-white rounded-[2rem] border border-stone-200 p-5 sm:p-6 shadow-sm hover:shadow-md transition-all group flex flex-col h-full"
+      className="bg-white rounded-[2rem] border border-stone-200 p-6 shadow-sm hover:shadow-md transition-all group flex flex-col h-full"
     >
-      {/* Author and Info at Top */}
-      <div className="flex flex-col gap-4 mb-5">
-        <div className="flex items-center justify-between">
-          <Link 
-            to={`/user/${term.created_by}`}
-            className="flex items-center gap-2 group/author hover:bg-stone-50 p-1 -ml-1 rounded-xl transition-colors max-w-[70%]"
+      {/* Top Section: Author and Favorite */}
+      <div className="flex items-center justify-between mb-6">
+        <Link 
+          to={`/user/${term.created_by}`}
+          className="flex items-center gap-3 group/author hover:bg-stone-50 p-1 -ml-1 rounded-2xl transition-colors min-w-0"
+        >
+          <UserAvatar user={author} size="sm" className="ring-2 ring-stone-50" />
+          <div className="flex flex-col min-w-0">
+            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider leading-none mb-1">Автор</span>
+            <span className="text-sm font-bold text-stone-700 group-hover/author:text-emerald-600 transition-colors truncate">
+              {author.full_name || author.username || 'Аноним'}
+            </span>
+          </div>
+        </Link>
+        
+        {user && (
+          <button
+            onClick={handleToggleFavorite}
+            disabled={isToggling}
+            className={`p-2.5 rounded-2xl transition-all ${isFavorite ? 'bg-red-50 text-red-500 shadow-sm' : 'bg-stone-100 text-stone-400 hover:text-red-400 hover:bg-red-50'}`}
+            title={isFavorite ? 'Удалить из избранного' : 'Добавить в избранное'}
           >
-            <UserAvatar user={author} size="sm" />
-            <div className="flex flex-col min-w-0">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-stone-400 truncate">Автор</span>
-              <span className="text-[11px] font-bold text-stone-700 group-hover/author:text-emerald-600 transition-colors truncate">
-                {author.full_name || author.username || 'Аноним'}
-              </span>
-            </div>
-          </Link>
-          <div className="flex items-center gap-2">
-            {user && (
-              <button
-                onClick={handleToggleFavorite}
-                disabled={isToggling}
-                className={`p-2 rounded-xl transition-all ${isFavorite ? 'bg-red-50 text-red-500' : 'bg-stone-100 text-stone-400 hover:text-red-400 hover:bg-red-50'}`}
-                title={isFavorite ? 'Удалить из избранного' : 'Добавить в избранное'}
-              >
-                <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
-              </button>
-            )}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-stone-100 text-stone-600 rounded-xl text-[10px] font-bold uppercase tracking-widest border border-stone-200 shrink-0">
-              <Book className="w-3 h-3 text-emerald-600" />
-              <span>Класс {term.grade}</span>
-            </div>
+            <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
+          </button>
+        )}
+      </div>
+
+      {/* Main Content */}
+      <Link to={`/term/${term.id}`} className="block flex-grow group-hover:no-underline">
+        <h3 className="font-serif text-2xl font-bold text-stone-900 mb-3 group-hover:text-emerald-600 transition-colors break-words leading-tight">
+          {name}
+        </h3>
+        
+        {/* Metadata Badges */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100">
+            <Book className="w-3 h-3" />
+            <span>Класс {term.grade}</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-stone-100 text-stone-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-stone-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-stone-400" />
+            <span>{term.subject_name_ru || 'Математика'}</span>
           </div>
         </div>
 
-        {/* Languages Badge */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[9px] font-bold uppercase tracking-widest text-stone-400">Языки:</span>
-          <div className="flex gap-1.5 flex-wrap">
+        <p className="text-stone-600 text-sm line-clamp-3 mb-6 leading-relaxed italic break-words">
+          {definition}
+        </p>
+      </Link>
+
+      {/* Footer Section */}
+      <div className="flex items-center justify-between pt-5 border-t border-stone-100 mt-auto">
+        <div className="flex items-center gap-2 overflow-hidden">
+          <span className="text-[9px] font-bold uppercase tracking-widest text-stone-400 shrink-0">Языки:</span>
+          <div className="flex gap-1 overflow-x-auto no-scrollbar">
             {term.translations?.map((t: any) => (
               <span 
                 key={t.lang_code}
-                className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[9px] font-black uppercase tracking-wider border border-emerald-100"
+                className="px-1.5 py-0.5 bg-stone-50 text-stone-500 rounded border border-stone-200 text-[8px] font-black uppercase tracking-wider"
               >
                 {t.lang_code}
               </span>
             ))}
           </div>
         </div>
-      </div>
-
-      <Link to={`/term/${term.id}`} className="block flex-grow group-hover:no-underline">
-        <h3 className="font-serif text-xl sm:text-2xl font-bold text-stone-900 mb-2 group-hover:text-emerald-600 transition-colors break-words leading-tight">
-          {name}
-        </h3>
         
-        <p className="text-stone-600 text-sm line-clamp-3 mb-4 leading-relaxed italic break-words">
-          {definition}
-        </p>
-      </Link>
-
-      <div className="flex items-center justify-between pt-4 border-t border-stone-100 mt-auto">
-        <div className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">
-          {term.subject_name_ru || 'Математика'}
-        </div>
-        <Link to={`/term/${term.id}`} className="flex items-center gap-1 text-emerald-600 font-bold text-sm hover:underline">
+        <Link to={`/term/${term.id}`} className="flex items-center gap-1 text-emerald-600 font-bold text-sm hover:underline shrink-0 ml-4">
           <span>Подробнее</span>
           <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
         </Link>
