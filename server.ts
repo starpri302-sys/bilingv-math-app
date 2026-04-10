@@ -141,6 +141,18 @@ async function initDb(forceReinstall = false) {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    // Migration: Add contact_info and bio if they don't exist (for existing databases)
+    try {
+      await client.exec("ALTER TABLE users ADD COLUMN contact_info TEXT");
+      console.log("Migration: Added 'contact_info' column to 'users' table.");
+    } catch (e) { /* ignore */ }
+    
+    try {
+      await client.exec("ALTER TABLE users ADD COLUMN bio TEXT");
+      console.log("Migration: Added 'bio' column to 'users' table.");
+    } catch (e) { /* ignore */ }
+
     console.log("Table 'users' ready.");
 
     await client.query(`
@@ -598,7 +610,7 @@ async function startServer() {
       res.json(userRes.rows[0]);
     } catch (error: any) {
       console.error(`GET /api/users/${id} - Error:`, error);
-      res.status(500).json({ error: "Internal server error", message: error.message });
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
@@ -959,7 +971,7 @@ async function startServer() {
       res.json(termsWithTranslations);
     } catch (error: any) {
       console.error('Error fetching terms:', error);
-      res.status(500).json({ error: "Internal server error", message: error.message });
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
