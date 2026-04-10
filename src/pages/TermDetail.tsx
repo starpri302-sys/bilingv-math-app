@@ -102,7 +102,8 @@ export default function TermDetail() {
   const formatContent = (html: string) => {
     if (!html) return '';
     // Replace space before dash with non-breaking space to prevent awkward wrapping
-    return html.replace(/\s+-\s+/g, '&nbsp;-&nbsp;');
+    // Using em-dash (—) and NBSP after it to keep it with the following word in definitions
+    return html.replace(/\s+-\s+/g, ' &mdash;&nbsp;');
   };
 
   const activeLanguages = languages.filter(lang => viewMode === 'both' || viewMode === lang.code);

@@ -52,7 +52,7 @@ export default function TermCard({ term, language }: TermCardProps) {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/\s+-\s+/g, '\u00A0-\u00A0'); // Replace space-dash-space with nbsp-dash-nbsp for better wrapping
+    .replace(/\s+-\s+/g, ' \u2014\u00A0'); // Replace space-dash-space with space-emdash-nbsp to keep dash with next word
 
   const author = {
     username: term.author_name,
