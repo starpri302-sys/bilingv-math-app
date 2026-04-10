@@ -44,8 +44,9 @@ export default function TermCard({ term, language }: TermCardProps) {
   
   // Strip HTML tags and decode common entities like &nbsp;
   const definition = rawDefinition
+    .replace(/<br\s*\/?>|<\/p>|<\/div>|<\/li>|<\/h\d>/gi, ' ') // Replace block tags with spaces to avoid merging words
     .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
+    .replace(/&nbsp;/g, '\u00A0') // Keep non-breaking spaces as characters
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
@@ -111,7 +112,7 @@ export default function TermCard({ term, language }: TermCardProps) {
         </div>
 
         <div className="bg-stone-50/50 border border-stone-100 rounded-2xl p-4 mb-6 group-hover:bg-white transition-colors">
-          <p className="text-stone-600 text-sm line-clamp-3 leading-relaxed italic break-words">
+          <p className="text-stone-600 text-sm line-clamp-3 leading-relaxed italic break-words text-pretty">
             {definition}
           </p>
         </div>
