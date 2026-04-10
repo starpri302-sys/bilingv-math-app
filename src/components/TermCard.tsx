@@ -110,9 +110,11 @@ export default function TermCard({ term, language }: TermCardProps) {
           </div>
         </div>
 
-        <p className="text-stone-600 text-sm line-clamp-3 mb-6 leading-relaxed italic break-words">
-          {definition}
-        </p>
+        <div className="bg-stone-50/50 border border-stone-100 rounded-2xl p-4 mb-6 group-hover:bg-white transition-colors">
+          <p className="text-stone-600 text-sm line-clamp-3 leading-relaxed italic break-words">
+            {definition}
+          </p>
+        </div>
       </Link>
 
       {/* Footer Section */}

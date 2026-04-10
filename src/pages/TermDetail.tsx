@@ -271,10 +271,12 @@ export default function TermDetail() {
                       <Book className="w-4 h-4" />
                       Определение
                     </h3>
-                    <div 
-                      className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full"
-                      dangerouslySetInnerHTML={{ __html: translation?.definition || '' }}
-                    />
+                    <div className="bg-stone-50 border border-stone-200 rounded-3xl p-6 sm:p-8 focus-within:ring-2 focus-within:ring-emerald-500 transition-all">
+                      <div 
+                        className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full overflow-x-auto"
+                        dangerouslySetInnerHTML={{ __html: translation?.definition || '' }}
+                      />
+                    </div>
                   </section>
                 </div>
               );
@@ -292,7 +294,7 @@ export default function TermDetail() {
                         Пример
                       </h3>
                       <div 
-                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full"
+                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full overflow-x-auto"
                         dangerouslySetInnerHTML={{ __html: translation.example }}
                       />
                     </section>
@@ -311,9 +313,11 @@ export default function TermDetail() {
                   {translation?.additional ? (
                     <section className="space-y-3">
                       <h3 className="text-stone-400 font-bold text-xs uppercase tracking-widest">Дополнительно</h3>
-                      <p className="text-stone-600 text-sm leading-relaxed">
-                        {translation.additional}
-                      </p>
+                      <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4">
+                        <p className="text-stone-600 text-sm leading-relaxed">
+                          {translation.additional}
+                        </p>
+                      </div>
                     </section>
                   ) : (
                     <div className="h-full" />
@@ -355,10 +359,12 @@ export default function TermDetail() {
                       <Book className="w-4 h-4" />
                       Определение
                     </h3>
-                    <div 
-                      className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full"
-                      dangerouslySetInnerHTML={{ __html: translation.definition }}
-                    />
+                    <div className="bg-stone-50 border border-stone-200 rounded-3xl p-6 sm:p-8">
+                      <div 
+                        className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full overflow-x-auto"
+                        dangerouslySetInnerHTML={{ __html: translation.definition }}
+                      />
+                    </div>
                   </section>
                   {translation.example && (
                     <section className="space-y-3 p-4 sm:p-6 bg-emerald-50 rounded-2xl border border-emerald-100">
@@ -367,7 +373,7 @@ export default function TermDetail() {
                         Пример
                       </h3>
                       <div 
-                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full"
+                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full overflow-x-auto"
                         dangerouslySetInnerHTML={{ __html: translation.example }}
                       />
                     </section>
@@ -375,9 +381,11 @@ export default function TermDetail() {
                   {translation.additional && (
                     <section className="space-y-3">
                       <h3 className="text-stone-400 font-bold text-xs uppercase tracking-widest">Дополнительно</h3>
-                      <p className="text-stone-600 text-sm leading-relaxed break-words">
-                        {translation.additional}
-                      </p>
+                      <div className="bg-stone-50 border border-stone-200 rounded-2xl p-6">
+                        <p className="text-stone-600 text-sm leading-relaxed break-words">
+                          {translation.additional}
+                        </p>
+                      </div>
                     </section>
                   )}
                 </div>
