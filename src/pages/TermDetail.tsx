@@ -101,11 +101,11 @@ export default function TermDetail() {
 
   const formatContent = (html: string) => {
     if (!html) return '';
-    // Replace space before and after dash with non-breaking spaces to keep the dash 
-    // connected to both words, preventing it from hanging at the end or start of a line.
+    // Replace space before dash with non-breaking space to keep the dash 
+    // connected to the preceding word, but allow a break after the dash.
     return html
-      .replace(/\s+-\s+/g, '&nbsp;&mdash;&nbsp;')
-      .replace(/\s+—\s+/g, '&nbsp;&mdash;&nbsp;');
+      .replace(/\s+-\s+/g, '&nbsp;&mdash; ')
+      .replace(/\s+—\s+/g, '&nbsp;&mdash; ');
   };
 
   const activeLanguages = languages.filter(lang => viewMode === 'both' || viewMode === lang.code);
@@ -282,7 +282,7 @@ export default function TermDetail() {
                     </h3>
                     <div className="bg-stone-50 border border-stone-200 rounded-3xl p-6 sm:p-8 focus-within:ring-2 focus-within:ring-emerald-500 transition-all">
                       <div 
-                        className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full overflow-x-auto"
+                        className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full overflow-x-auto break-words"
                         dangerouslySetInnerHTML={{ __html: formatContent(translation?.definition || '') }}
                       />
                     </div>
@@ -303,7 +303,7 @@ export default function TermDetail() {
                         Пример
                       </h3>
                       <div 
-                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full overflow-x-auto"
+                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full overflow-x-auto break-words"
                         dangerouslySetInnerHTML={{ __html: formatContent(translation.example) }}
                       />
                     </section>
@@ -370,7 +370,7 @@ export default function TermDetail() {
                     </h3>
                     <div className="bg-stone-50 border border-stone-200 rounded-3xl p-6 sm:p-8">
                       <div 
-                        className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full overflow-x-auto"
+                        className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full overflow-x-auto break-words"
                         dangerouslySetInnerHTML={{ __html: formatContent(translation.definition) }}
                       />
                     </div>
@@ -382,7 +382,7 @@ export default function TermDetail() {
                         Пример
                       </h3>
                       <div 
-                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full overflow-x-auto"
+                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full overflow-x-auto break-words"
                         dangerouslySetInnerHTML={{ __html: formatContent(translation.example) }}
                       />
                     </section>

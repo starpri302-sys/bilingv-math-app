@@ -52,8 +52,8 @@ export default function TermCard({ term, language }: TermCardProps) {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/\s+-\s+/g, '\u00A0\u2014\u00A0')
-    .replace(/\s+—\s+/g, '\u00A0\u2014\u00A0');
+    .replace(/\s+-\s+/g, '\u00A0\u2014 ')
+    .replace(/\s+—\s+/g, '\u00A0\u2014 ');
 
   const author = {
     username: term.author_name,
@@ -114,7 +114,7 @@ export default function TermCard({ term, language }: TermCardProps) {
         </div>
 
         <div className="bg-stone-50/50 border border-stone-100 rounded-2xl p-4 mb-6 group-hover:bg-white transition-colors">
-          <p className="text-stone-600 text-sm line-clamp-3 leading-relaxed italic">
+          <p className="text-stone-600 text-sm line-clamp-3 leading-relaxed italic break-words">
             {definition}
           </p>
         </div>
