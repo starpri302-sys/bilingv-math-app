@@ -101,11 +101,11 @@ export default function TermDetail() {
 
   const formatContent = (html: string) => {
     if (!html) return '';
-    // Replace space before dash with non-breaking space to prevent awkward wrapping
-    // Using em-dash (—) and NBSP after it to keep it with the following word in definitions
+    // Replace space before and after dash with non-breaking spaces to keep the dash 
+    // connected to both words, preventing it from hanging at the end or start of a line.
     return html
-      .replace(/\s+-\s+/g, '&nbsp;&mdash; ')
-      .replace(/\s+—\s+/g, '&nbsp;&mdash; ');
+      .replace(/\s+-\s+/g, '&nbsp;&mdash;&nbsp;')
+      .replace(/\s+—\s+/g, '&nbsp;&mdash;&nbsp;');
   };
 
   const activeLanguages = languages.filter(lang => viewMode === 'both' || viewMode === lang.code);

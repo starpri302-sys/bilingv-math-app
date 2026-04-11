@@ -4,13 +4,9 @@
 @layer base {
   body {
     @apply overflow-x-hidden;
-    overflow-wrap: break-word;
-    word-break: break-word;
   }
   .prose {
-    @apply max-w-none w-full break-words;
-    overflow-wrap: break-word;
-    word-break: break-word;
+    @apply max-w-none w-full;
   }
   .prose p, .prose ul, .prose ol, .prose blockquote {
     @apply max-w-none w-full;
