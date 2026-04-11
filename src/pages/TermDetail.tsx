@@ -101,7 +101,11 @@ export default function TermDetail() {
 
   const formatContent = (html: string) => {
     if (!html) return '';
-    return html;
+    // Replace space before dash with non-breaking space to prevent awkward wrapping
+    // Using em-dash (—) and NBSP after it to keep it with the following word in definitions
+    return html
+      .replace(/\s+-\s+/g, '&nbsp;&mdash; ')
+      .replace(/\s+—\s+/g, '&nbsp;&mdash; ');
   };
 
   const activeLanguages = languages.filter(lang => viewMode === 'both' || viewMode === lang.code);
@@ -278,7 +282,7 @@ export default function TermDetail() {
                     </h3>
                     <div className="bg-stone-50 border border-stone-200 rounded-3xl p-6 sm:p-8 focus-within:ring-2 focus-within:ring-emerald-500 transition-all">
                       <div 
-                        className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full overflow-x-auto text-pretty hyphens-auto"
+                        className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full overflow-x-auto"
                         dangerouslySetInnerHTML={{ __html: formatContent(translation?.definition || '') }}
                       />
                     </div>
@@ -299,7 +303,7 @@ export default function TermDetail() {
                         Пример
                       </h3>
                       <div 
-                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full overflow-x-auto text-pretty hyphens-auto"
+                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full overflow-x-auto"
                         dangerouslySetInnerHTML={{ __html: formatContent(translation.example) }}
                       />
                     </section>
@@ -355,7 +359,7 @@ export default function TermDetail() {
                   <Languages className="w-4 h-4" />
                   <span>{lang.name}</span>
                 </div>
-                <h1 className="font-serif text-3xl sm:text-5xl font-black text-stone-900 leading-tight break-words text-pretty">
+                <h1 className="font-serif text-3xl sm:text-5xl font-black text-stone-900 leading-tight break-words">
                   {translation.name}
                 </h1>
                 <div className="space-y-6">
@@ -366,7 +370,7 @@ export default function TermDetail() {
                     </h3>
                     <div className="bg-stone-50 border border-stone-200 rounded-3xl p-6 sm:p-8">
                       <div 
-                        className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full overflow-x-auto text-pretty hyphens-auto"
+                        className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full overflow-x-auto"
                         dangerouslySetInnerHTML={{ __html: formatContent(translation.definition) }}
                       />
                     </div>
@@ -378,7 +382,7 @@ export default function TermDetail() {
                         Пример
                       </h3>
                       <div 
-                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full overflow-x-auto text-pretty hyphens-auto"
+                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full overflow-x-auto"
                         dangerouslySetInnerHTML={{ __html: formatContent(translation.example) }}
                       />
                     </section>
