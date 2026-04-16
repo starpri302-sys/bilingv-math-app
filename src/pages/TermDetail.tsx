@@ -259,9 +259,15 @@ export default function TermDetail() {
               const translation = term.translations?.find((t: any) => t.lang_code === lang.code);
               return (
                 <div key={`title-${lang.code}`} className="bg-white px-6 pb-6 border-x border-stone-200">
-                  <h1 className="font-serif text-4xl font-black text-stone-900 leading-tight">
-                    {translation?.name}
-                  </h1>
+                  <div className="relative group/field">
+                    <div className="absolute inset-0 bg-stone-100/20 rounded-2xl -m-1 blur-[1px] opacity-30" />
+                    <div className="relative bg-white border border-stone-100 rounded-2xl p-4 shadow-sm">
+                      <h1 className="font-serif text-4xl font-black text-stone-900 leading-tight break-words">
+                        {translation?.name}
+                      </h1>
+                      <div className="absolute bottom-2 right-2 w-3 h-3 border-r border-b border-stone-200 rounded-br-sm opacity-30" />
+                    </div>
+                  </div>
                 </div>
               );
             })}
@@ -322,10 +328,14 @@ export default function TermDetail() {
                   {translation?.additional ? (
                     <section className="space-y-3">
                       <h3 className="text-stone-400 font-bold text-xs uppercase tracking-widest">Дополнительно</h3>
-                      <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4">
-                        <p className="text-stone-600 text-sm leading-relaxed">
-                          {translation.additional}
-                        </p>
+                      <div className="relative group/field">
+                        <div className="absolute inset-0 bg-stone-100/30 rounded-3xl -m-1 blur-[2px] opacity-50" />
+                        <div className="relative bg-white border border-stone-200 rounded-3xl p-4 sm:p-6 shadow-inner min-h-[80px]">
+                          <p className="text-stone-600 text-sm leading-relaxed break-words">
+                            {translation.additional}
+                          </p>
+                          <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-stone-200 rounded-br-md opacity-40" />
+                        </div>
                       </div>
                     </section>
                   ) : (
@@ -359,9 +369,15 @@ export default function TermDetail() {
                   <Languages className="w-4 h-4" />
                   <span>{lang.name}</span>
                 </div>
-                <h1 className="font-serif text-3xl sm:text-5xl font-black text-stone-900 leading-tight break-words">
-                  {translation.name}
-                </h1>
+                <div className="relative group/field">
+                  <div className="absolute inset-0 bg-stone-100/20 rounded-[2rem] -m-1 blur-[2px] opacity-30" />
+                  <div className="relative bg-white border border-stone-100 rounded-[2rem] p-6 sm:p-8 shadow-sm">
+                    <h1 className="font-serif text-3xl sm:text-5xl font-black text-stone-900 leading-tight break-words">
+                      {translation.name}
+                    </h1>
+                    <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-stone-200 rounded-br-md opacity-30" />
+                  </div>
+                </div>
                 <div className="space-y-6">
                   <section className="space-y-3">
                     <h3 className="flex items-center gap-2 text-stone-400 font-bold text-xs uppercase tracking-widest">
@@ -400,10 +416,14 @@ export default function TermDetail() {
                   {translation.additional && (
                     <section className="space-y-3">
                       <h3 className="text-stone-400 font-bold text-xs uppercase tracking-widest">Дополнительно</h3>
-                      <div className="bg-stone-50 border border-stone-200 rounded-2xl p-6">
-                        <p className="text-stone-600 text-sm leading-relaxed break-words">
-                          {translation.additional}
-                        </p>
+                      <div className="relative group/field">
+                        <div className="absolute inset-0 bg-stone-100/30 rounded-3xl -m-1 blur-[2px] opacity-50" />
+                        <div className="relative bg-white border border-stone-200 rounded-3xl p-6 shadow-inner min-h-[80px]">
+                          <p className="text-stone-600 text-sm leading-relaxed break-words">
+                            {translation.additional}
+                          </p>
+                          <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-stone-200 rounded-br-md opacity-40" />
+                        </div>
                       </div>
                     </section>
                   )}
