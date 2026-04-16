@@ -42,18 +42,16 @@ export default function TermCard({ term, language }: TermCardProps) {
   const name = translation.name || 'No Name';
   const rawDefinition = translation.definition || '';
   
-  // Strip HTML tags and decode common entities like &nbsp;
+  // Strip HTML tags and decode common entities
   const definition = rawDefinition
-    .replace(/<br\s*\/?>|<\/p>|<\/div>|<\/li>|<\/h\d>/gi, ' ') // Replace block tags with spaces to avoid merging words
+    .replace(/<br\s*\/?>|<\/p>|<\/div>|<\/li>|<\/h\d>/gi, ' ')
     .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, '\u00A0') // Keep non-breaking spaces as characters
+    .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s+-\s+/g, '\u00A0\u2014 ')
-    .replace(/\s+—\s+/g, '\u00A0\u2014 ');
+    .replace(/&#39;/g, "'");
 
   const author = {
     username: term.author_name,
@@ -113,10 +111,15 @@ export default function TermCard({ term, language }: TermCardProps) {
           </div>
         </div>
 
-        <div className="bg-stone-50/50 border border-stone-100 rounded-2xl p-4 mb-6 group-hover:bg-white transition-colors">
-          <p className="text-stone-600 text-sm line-clamp-3 leading-relaxed italic break-words">
-            {definition}
-          </p>
+        {/* Definition "Textbox" */}
+        <div className="relative mb-6">
+          <div className="absolute inset-0 bg-stone-100/50 rounded-xl -m-0.5 blur-[1px] opacity-50" />
+          <div className="relative bg-white border border-stone-200 rounded-xl p-4 shadow-inner min-h-[80px]">
+            <p className="text-stone-600 text-sm line-clamp-3 leading-relaxed italic break-words">
+              {definition}
+            </p>
+            <div className="absolute bottom-2 right-2 w-2 h-2 border-r border-b border-stone-300 rounded-br-sm opacity-40" />
+          </div>
         </div>
       </Link>
 

@@ -101,11 +101,7 @@ export default function TermDetail() {
 
   const formatContent = (html: string) => {
     if (!html) return '';
-    // Replace space before dash with non-breaking space to keep the dash 
-    // connected to the preceding word, but allow a break after the dash.
-    return html
-      .replace(/\s+-\s+/g, '&nbsp;&mdash; ')
-      .replace(/\s+—\s+/g, '&nbsp;&mdash; ');
+    return html;
   };
 
   const activeLanguages = languages.filter(lang => viewMode === 'both' || viewMode === lang.code);
@@ -280,11 +276,15 @@ export default function TermDetail() {
                       <Book className="w-4 h-4" />
                       Определение
                     </h3>
-                    <div className="bg-stone-50 border border-stone-200 rounded-3xl p-6 sm:p-8 focus-within:ring-2 focus-within:ring-emerald-500 transition-all">
-                      <div 
-                        className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full overflow-x-auto break-words"
-                        dangerouslySetInnerHTML={{ __html: formatContent(translation?.definition || '') }}
-                      />
+                    <div className="relative group/field">
+                      <div className="absolute inset-0 bg-stone-100/30 rounded-3xl -m-1 blur-[2px] opacity-50" />
+                      <div className="relative bg-white border border-stone-200 rounded-3xl p-6 sm:p-8 shadow-inner min-h-[120px]">
+                        <div 
+                          className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full overflow-x-auto break-words"
+                          dangerouslySetInnerHTML={{ __html: formatContent(translation?.definition || '') }}
+                        />
+                        <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-stone-200 rounded-br-md opacity-40" />
+                      </div>
                     </div>
                   </section>
                 </div>
@@ -297,16 +297,16 @@ export default function TermDetail() {
               return (
                 <div key={`example-${lang.code}`} className="bg-white px-4 pb-8 border-x border-stone-200 min-w-0">
                   {translation?.example ? (
-                    <section className="space-y-3 p-6 bg-emerald-50 rounded-2xl border border-emerald-100 h-full w-full">
-                      <h3 className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest">
-                        <Lightbulb className="w-4 h-4" />
-                        Пример
-                      </h3>
-                      <div 
-                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full overflow-x-auto break-words"
-                        dangerouslySetInnerHTML={{ __html: formatContent(translation.example) }}
-                      />
-                    </section>
+                    <div className="relative group/field">
+                      <div className="absolute inset-0 bg-emerald-100/20 rounded-3xl -m-1 blur-[2px] opacity-30" />
+                      <div className="relative bg-white border border-emerald-100 rounded-3xl p-6 sm:p-8 shadow-inner min-h-[100px]">
+                        <div 
+                          className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full overflow-x-auto break-words"
+                          dangerouslySetInnerHTML={{ __html: formatContent(translation.example) }}
+                        />
+                        <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-emerald-200 rounded-br-md opacity-40" />
+                      </div>
+                    </div>
                   ) : (
                     <div className="h-full" />
                   )}
@@ -368,23 +368,33 @@ export default function TermDetail() {
                       <Book className="w-4 h-4" />
                       Определение
                     </h3>
-                    <div className="bg-stone-50 border border-stone-200 rounded-3xl p-6 sm:p-8">
-                      <div 
-                        className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full overflow-x-auto break-words"
-                        dangerouslySetInnerHTML={{ __html: formatContent(translation.definition) }}
-                      />
+                    <div className="relative group/field">
+                      <div className="absolute inset-0 bg-stone-100/30 rounded-3xl -m-1 blur-[2px] opacity-50" />
+                      <div className="relative bg-white border border-stone-200 rounded-3xl p-6 sm:p-8 shadow-inner min-h-[120px]">
+                        <div 
+                          className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full overflow-x-auto break-words"
+                          dangerouslySetInnerHTML={{ __html: formatContent(translation.definition) }}
+                        />
+                        <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-stone-200 rounded-br-md opacity-40" />
+                      </div>
                     </div>
                   </section>
                   {translation.example && (
-                    <section className="space-y-3 p-4 sm:p-6 bg-emerald-50 rounded-2xl border border-emerald-100">
+                    <section className="space-y-3">
                       <h3 className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest">
                         <Lightbulb className="w-4 h-4" />
                         Пример
                       </h3>
-                      <div 
-                        className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full overflow-x-auto break-words"
-                        dangerouslySetInnerHTML={{ __html: formatContent(translation.example) }}
-                      />
+                      <div className="relative group/field">
+                        <div className="absolute inset-0 bg-emerald-100/20 rounded-3xl -m-1 blur-[2px] opacity-30" />
+                        <div className="relative bg-white border border-emerald-100 rounded-3xl p-4 sm:p-6 shadow-inner min-h-[100px]">
+                          <div 
+                            className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full overflow-x-auto break-words"
+                            dangerouslySetInnerHTML={{ __html: formatContent(translation.example) }}
+                          />
+                          <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-emerald-200 rounded-br-md opacity-40" />
+                        </div>
+                      </div>
                     </section>
                   )}
                   {translation.additional && (
