@@ -101,7 +101,10 @@ export default function TermDetail() {
 
   const formatContent = (html: string) => {
     if (!html) return '';
-    return html;
+    return html
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+-\s+/g, '&nbsp;&mdash; ')
+      .replace(/\s+—\s+/g, '&nbsp;&mdash; ');
   };
 
   const activeLanguages = languages.filter(lang => viewMode === 'both' || viewMode === lang.code);
@@ -286,7 +289,7 @@ export default function TermDetail() {
                       <div className="absolute inset-0 bg-stone-100/30 rounded-3xl -m-1 blur-[2px] opacity-50" />
                       <div className="relative bg-white border border-stone-200 rounded-3xl p-6 sm:p-8 shadow-inner min-h-[120px]">
                         <div 
-                          className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full overflow-x-auto break-words"
+                          className="text-stone-700 text-lg leading-relaxed font-medium w-full break-words"
                           dangerouslySetInnerHTML={{ __html: formatContent(translation?.definition || '') }}
                         />
                         <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-stone-200 rounded-br-md opacity-40" />
@@ -307,7 +310,7 @@ export default function TermDetail() {
                       <div className="absolute inset-0 bg-emerald-100/20 rounded-3xl -m-1 blur-[2px] opacity-30" />
                       <div className="relative bg-white border border-emerald-100 rounded-3xl p-6 sm:p-8 shadow-inner min-h-[100px]">
                         <div 
-                          className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full overflow-x-auto break-words"
+                          className="text-emerald-900 font-medium leading-relaxed italic w-full break-words"
                           dangerouslySetInnerHTML={{ __html: formatContent(translation.example) }}
                         />
                         <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-emerald-200 rounded-br-md opacity-40" />
@@ -388,7 +391,7 @@ export default function TermDetail() {
                       <div className="absolute inset-0 bg-stone-100/30 rounded-3xl -m-1 blur-[2px] opacity-50" />
                       <div className="relative bg-white border border-stone-200 rounded-3xl p-6 sm:p-8 shadow-inner min-h-[120px]">
                         <div 
-                          className="text-stone-700 text-lg leading-relaxed font-medium prose prose-stone !max-w-none w-full overflow-x-auto break-words"
+                          className="text-stone-700 text-lg leading-relaxed font-medium w-full break-words"
                           dangerouslySetInnerHTML={{ __html: formatContent(translation.definition) }}
                         />
                         <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-stone-200 rounded-br-md opacity-40" />
@@ -405,7 +408,7 @@ export default function TermDetail() {
                         <div className="absolute inset-0 bg-emerald-100/20 rounded-3xl -m-1 blur-[2px] opacity-30" />
                         <div className="relative bg-white border border-emerald-100 rounded-3xl p-4 sm:p-6 shadow-inner min-h-[100px]">
                           <div 
-                            className="text-emerald-900 font-medium leading-relaxed italic prose prose-emerald !max-w-none w-full overflow-x-auto break-words"
+                            className="text-emerald-900 font-medium leading-relaxed italic w-full break-words"
                             dangerouslySetInnerHTML={{ __html: formatContent(translation.example) }}
                           />
                           <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-emerald-200 rounded-br-md opacity-40" />
