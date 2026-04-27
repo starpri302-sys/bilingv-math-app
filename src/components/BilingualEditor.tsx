@@ -225,10 +225,26 @@ export default function BilingualEditor({ onClose, initialData }: BilingualEdito
                   className="space-y-6"
                 >
                   <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-stone-400">
-                      <Languages className="w-4 h-4" />
-                      Название ({lang.name})
-                    </label>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-stone-400">
+                        <Languages className="w-4 h-4" />
+                        Название ({lang.name})
+                      </label>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const current = formData.translations[lang.code]?.name || '';
+                            handleTranslationChange(lang.code, 'name', current + '□');
+                          }}
+                          className="px-2 py-1 bg-stone-100 hover:bg-stone-200 border border-stone-200 rounded text-xs font-bold text-stone-600 transition-all flex items-center gap-1"
+                          title="Вставить квадрат (плейсхолдер)"
+                        >
+                          <span className="text-sm">□</span>
+                          Вставить бокс
+                        </button>
+                      </div>
+                    </div>
                     <input
                       type="text"
                       value={formData.translations[lang.code]?.name || ''}
@@ -238,10 +254,24 @@ export default function BilingualEditor({ onClose, initialData }: BilingualEdito
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-stone-400">
-                      <Book className="w-4 h-4" />
-                      Определение
-                    </label>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-stone-400">
+                        <Book className="w-4 h-4" />
+                        Определение
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = formData.translations[lang.code]?.definition || '';
+                          handleTranslationChange(lang.code, 'definition', current + ' □ ');
+                        }}
+                        className="px-2 py-1 bg-stone-100 hover:bg-stone-200 border border-stone-200 rounded text-xs font-bold text-stone-600 transition-all flex items-center gap-1"
+                        title="Вставить квадрат (плейсхолдер)"
+                      >
+                        <span className="text-sm">□</span>
+                        Вставить бокс
+                      </button>
+                    </div>
                     <div className="bg-stone-50 border border-stone-200 rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500 transition-all">
                       <ReactQuill
                         theme="snow"

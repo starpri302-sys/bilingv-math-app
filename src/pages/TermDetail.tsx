@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import BilingualEditor from '../components/BilingualEditor';
+import MathText from '../components/MathText';
 import SEO from '../components/SEO';
 import UserAvatar from '../components/UserAvatar';
 import { useAuth } from '../store/authContext';
@@ -265,9 +266,11 @@ export default function TermDetail() {
                   <div className="relative group/field">
                     <div className="absolute inset-0 bg-stone-100/20 rounded-2xl -m-1 blur-[1px] opacity-30" />
                     <div className="relative bg-white border border-stone-100 rounded-2xl p-4 shadow-sm">
-                      <h1 className="font-serif text-4xl font-black text-stone-900 leading-tight break-words">
-                        {translation?.name}
-                      </h1>
+                      <MathText 
+                        text={translation?.name || ''} 
+                        as="h1" 
+                        className="font-serif text-4xl font-black text-stone-900 leading-tight break-words" 
+                      />
                       <div className="absolute bottom-2 right-2 w-3 h-3 border-r border-b border-stone-200 rounded-br-sm opacity-30" />
                     </div>
                   </div>
@@ -288,9 +291,10 @@ export default function TermDetail() {
                     <div className="relative group/field">
                       <div className="absolute inset-0 bg-stone-100/30 rounded-3xl -m-1 blur-[2px] opacity-50" />
                       <div className="relative bg-white border border-stone-200 rounded-3xl p-6 sm:p-8 shadow-inner min-h-[120px]">
-                        <div 
-                          className="text-stone-700 text-lg leading-relaxed font-medium w-full break-words"
-                          dangerouslySetInnerHTML={{ __html: formatContent(translation?.definition || '') }}
+                        <MathText 
+                          text={formatContent(translation?.definition || '')} 
+                          isHtml 
+                          className="text-stone-700 text-lg leading-relaxed font-medium w-full break-words" 
                         />
                         <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-stone-200 rounded-br-md opacity-40" />
                       </div>
@@ -309,9 +313,10 @@ export default function TermDetail() {
                     <div className="relative group/field">
                       <div className="absolute inset-0 bg-emerald-100/20 rounded-3xl -m-1 blur-[2px] opacity-30" />
                       <div className="relative bg-white border border-emerald-100 rounded-3xl p-6 sm:p-8 shadow-inner min-h-[100px]">
-                        <div 
-                          className="text-emerald-900 font-medium leading-relaxed italic w-full break-words"
-                          dangerouslySetInnerHTML={{ __html: formatContent(translation.example) }}
+                        <MathText 
+                          text={formatContent(translation.example)} 
+                          isHtml 
+                          className="text-emerald-900 font-medium leading-relaxed italic w-full break-words" 
                         />
                         <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-emerald-200 rounded-br-md opacity-40" />
                       </div>
@@ -334,9 +339,11 @@ export default function TermDetail() {
                       <div className="relative group/field">
                         <div className="absolute inset-0 bg-stone-100/30 rounded-3xl -m-1 blur-[2px] opacity-50" />
                         <div className="relative bg-white border border-stone-200 rounded-3xl p-4 sm:p-6 shadow-inner min-h-[80px]">
-                          <p className="text-stone-600 text-sm leading-relaxed break-words">
-                            {translation.additional}
-                          </p>
+                          <MathText 
+                            text={translation.additional} 
+                            className="text-stone-600 text-sm leading-relaxed break-words" 
+                            as="p" 
+                          />
                           <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-stone-200 rounded-br-md opacity-40" />
                         </div>
                       </div>
@@ -375,9 +382,11 @@ export default function TermDetail() {
                 <div className="relative group/field">
                   <div className="absolute inset-0 bg-stone-100/20 rounded-[2rem] -m-1 blur-[2px] opacity-30" />
                   <div className="relative bg-white border border-stone-100 rounded-[2rem] p-6 sm:p-8 shadow-sm">
-                    <h1 className="font-serif text-3xl sm:text-5xl font-black text-stone-900 leading-tight break-words">
-                      {translation.name}
-                    </h1>
+                    <MathText 
+                      text={translation.name} 
+                      as="h1" 
+                      className="font-serif text-3xl sm:text-5xl font-black text-stone-900 leading-tight break-words" 
+                    />
                     <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-stone-200 rounded-br-md opacity-30" />
                   </div>
                 </div>
@@ -390,9 +399,10 @@ export default function TermDetail() {
                     <div className="relative group/field">
                       <div className="absolute inset-0 bg-stone-100/30 rounded-3xl -m-1 blur-[2px] opacity-50" />
                       <div className="relative bg-white border border-stone-200 rounded-3xl p-6 sm:p-8 shadow-inner min-h-[120px]">
-                        <div 
-                          className="text-stone-700 text-lg leading-relaxed font-medium w-full break-words"
-                          dangerouslySetInnerHTML={{ __html: formatContent(translation.definition) }}
+                        <MathText 
+                          text={formatContent(translation.definition)} 
+                          isHtml 
+                          className="text-stone-700 text-lg leading-relaxed font-medium w-full break-words" 
                         />
                         <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-stone-200 rounded-br-md opacity-40" />
                       </div>
@@ -407,9 +417,10 @@ export default function TermDetail() {
                       <div className="relative group/field">
                         <div className="absolute inset-0 bg-emerald-100/20 rounded-3xl -m-1 blur-[2px] opacity-30" />
                         <div className="relative bg-white border border-emerald-100 rounded-3xl p-4 sm:p-6 shadow-inner min-h-[100px]">
-                          <div 
-                            className="text-emerald-900 font-medium leading-relaxed italic w-full break-words"
-                            dangerouslySetInnerHTML={{ __html: formatContent(translation.example) }}
+                          <MathText 
+                            text={formatContent(translation.example)} 
+                            isHtml 
+                            className="text-emerald-900 font-medium leading-relaxed italic w-full break-words" 
                           />
                           <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-emerald-200 rounded-br-md opacity-40" />
                         </div>
@@ -422,9 +433,11 @@ export default function TermDetail() {
                       <div className="relative group/field">
                         <div className="absolute inset-0 bg-stone-100/30 rounded-3xl -m-1 blur-[2px] opacity-50" />
                         <div className="relative bg-white border border-stone-200 rounded-3xl p-6 shadow-inner min-h-[80px]">
-                          <p className="text-stone-600 text-sm leading-relaxed break-words">
-                            {translation.additional}
-                          </p>
+                          <MathText 
+                            text={translation.additional} 
+                            as="p" 
+                            className="text-stone-600 text-sm leading-relaxed break-words" 
+                          />
                           <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-stone-200 rounded-br-md opacity-40" />
                         </div>
                       </div>

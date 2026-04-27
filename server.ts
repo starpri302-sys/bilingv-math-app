@@ -644,6 +644,102 @@ async function startServer() {
     }
   });
 
+  app.delete("/api/admin/users/:id", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "No token provided" });
+    const token = authHeader.split(' ')[1];
+
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      if (decoded.role !== 'super_admin') {
+        return res.status(403).json({ error: "Forbidden: Only Super-admin can delete users" });
+      }
+
+      const { id } = req.params;
+      if (id === 'admin' || id === 'system') {
+        return res.status(400).json({ error: "Cannot delete system users" });
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        // Delete related data first (though some have ON DELETE CASCADE, let's be safe)
+        await client.query("DELETE FROM notifications WHERE user_id = $1", [id]);
+        await client.query("DELETE FROM comments WHERE user_id = $1", [id]);
+        await client.query("DELETE FROM favorites WHERE user_id = $1", [id]);
+        await client.query("DELETE FROM term_versions WHERE user_id = $1", [id]);
+        
+        // Handle terms created by this user
+        // Option A: Delete them
+        // await client.query("DELETE FROM terms WHERE created_by = $1", [id]);
+        // Option B: Reassign them to 'system'
+        await client.query("UPDATE terms SET created_by = 'system' WHERE created_by = $1", [id]);
+        
+        await client.query("DELETE FROM users WHERE id = $1", [id]);
+        await client.query("COMMIT");
+        
+        await logAction(decoded.id, null, 'DELETE_USER', { deletedUserId: id });
+        res.json({ success: true });
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/admin/users/:id", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "No token provided" });
+    const token = authHeader.split(' ')[1];
+
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      if (decoded.role !== 'super_admin') {
+        return res.status(403).json({ error: "Forbidden: Only Super-admin can delete users" });
+      }
+
+      const { id } = req.params;
+      if (id === 'admin' || id === 'system') {
+        return res.status(400).json({ error: "Cannot delete system users" });
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        // Delete related data first (though some have ON DELETE CASCADE, let's be safe)
+        await client.query("DELETE FROM notifications WHERE user_id = $1", [id]);
+        await client.query("DELETE FROM comments WHERE user_id = $1", [id]);
+        await client.query("DELETE FROM favorites WHERE user_id = $1", [id]);
+        await client.query("DELETE FROM term_versions WHERE user_id = $1", [id]);
+        
+        // Handle terms created by this user
+        // Option A: Delete them
+        // await client.query("DELETE FROM terms WHERE created_by = $1", [id]);
+        // Option B: Reassign them to 'system'
+        await client.query("UPDATE terms SET created_by = 'system' WHERE created_by = $1", [id]);
+        
+        await client.query("DELETE FROM users WHERE id = $1", [id]);
+        await client.query("COMMIT");
+        
+        await logAction(decoded.id, null, 'DELETE_USER', { deletedUserId: id });
+        res.json({ success: true });
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Users API
   app.get("/api/users/:id", async (req, res) => {
     const { id } = req.params;

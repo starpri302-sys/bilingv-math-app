@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Book, ChevronRight, User, Heart } from 'lucide-react';
 import UserAvatar from './UserAvatar';
+import MathText from './MathText';
 import { api } from '../services/api';
 import { useAuth } from '../store/authContext';
 
@@ -97,8 +98,12 @@ export default function TermCard({ term, language }: TermCardProps) {
 
       {/* Main Content */}
       <Link to={`/term/${term.id}`} className="block flex-grow group-hover:no-underline">
-        <h3 className="font-serif text-2xl font-bold text-stone-900 mb-3 group-hover:text-emerald-600 transition-colors break-words leading-tight">
-          {name}
+        <h3 className="group-hover:text-emerald-600 transition-colors break-words mb-3">
+          <MathText 
+            text={name} 
+            as="span" 
+            className="font-serif text-2xl font-bold text-stone-900 leading-tight" 
+          />
         </h3>
         
         {/* Metadata Badges */}
@@ -117,9 +122,11 @@ export default function TermCard({ term, language }: TermCardProps) {
         <div className="relative mb-6">
           <div className="absolute inset-0 bg-stone-100/50 rounded-xl -m-0.5 blur-[1px] opacity-50" />
           <div className="relative bg-white border border-stone-200 rounded-xl p-4 shadow-inner min-h-[80px]">
-            <p className="text-stone-600 text-sm line-clamp-3 leading-relaxed italic break-words">
-              {definition}
-            </p>
+            <MathText 
+              text={definition} 
+              as="p" 
+              className="text-stone-600 text-sm line-clamp-3 leading-relaxed italic break-words" 
+            />
             <div className="absolute bottom-2 right-2 w-2 h-2 border-r border-b border-stone-300 rounded-br-sm opacity-40" />
           </div>
         </div>
