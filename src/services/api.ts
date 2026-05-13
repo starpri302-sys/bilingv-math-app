@@ -248,5 +248,35 @@ export const api = {
       headers: getAuthHeader()
     });
     return handleResponse(res);
+  },
+  async getCourses() {
+    const res = await fetch('/api/courses');
+    return handleResponse(res);
+  },
+  async getCourseLectures(courseId: string) {
+    const res = await fetch(`/api/courses/${courseId}/lectures`);
+    return handleResponse(res);
+  },
+  async getLecture(id: string) {
+    const res = await fetch(`/api/lectures/${id}`, {
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
+  async getLectureComments(lectureId: string) {
+    const res = await fetch(`/api/lectures/${lectureId}/comments`);
+    return handleResponse(res);
+  },
+  async addLectureComment(lectureId: string, content: string) {
+    const res = await fetch(`/api/lectures/${lectureId}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify({ content })
+    });
+    return handleResponse(res);
+  },
+  async getLectureQuiz(lectureId: string) {
+    const res = await fetch(`/api/lectures/${lectureId}/quiz`);
+    return handleResponse(res);
   }
 };

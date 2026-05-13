@@ -16,6 +16,8 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
+import Courses from './pages/Courses';
+import LectureDetail from './pages/LectureDetail';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 
@@ -38,6 +40,11 @@ export default function App() {
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/terms" element={<TermsOfService />} />
+              
+              {/* Educational content routes */}
+              <Route path="/courses" element={<Courses />} />
+              <Route path="/courses/:id" element={<Courses />} />
+              <Route path="/lectures/:id" element={<LectureDetail />} />
             </Routes>
           </main>
           <Footer />

@@ -3,7 +3,7 @@ import React from 'react';
 interface MathTextProps {
   text: string;
   className?: string;
-  as?: keyof JSX.IntrinsicElements;
+  as?: any;
   isHtml?: boolean;
 }
 
@@ -14,7 +14,7 @@ export default function MathText({ text, className, as: Component = 'span', isHt
   if (!text) return null;
 
   const styleDigit = (match: string) => {
-    return `<span class="font-mono font-bold text-[0.95em] text-stone-800" aria-hidden="false">${match}</span>`;
+    return `<span class="font-mono font-medium text-[1.1em] text-emerald-700 bg-emerald-50/50 px-0.5 rounded leading-none" aria-hidden="false">${match}</span>`;
   };
 
   if (isHtml) {
@@ -22,9 +22,9 @@ export default function MathText({ text, className, as: Component = 'span', isHt
       return `<span class="inline-flex items-center justify-center w-[1.1em] h-[1.1em] border-[1.5px] border-stone-400 rounded-[4px] bg-white align-middle mx-0.5 -mt-0.5 shadow-sm" aria-hidden="true"></span>`;
     });
 
-    // We only want to replace digits that are NOT part of HTML attributes
-    // This is a bit complex with regex, but for standard digits in text nodes:
+    // Replace digits and math symbols
     processedHtml = processedHtml.replace(/(?<!<[^>]*)\b(\d+)\b(?![^<]*>)/g, styleDigit);
+    processedHtml = processedHtml.replace(/(?<!<[^>]*)(\+|-|=|>|<|\*|\/|\^|√)(?![^<]*>)/g, '<span class="font-mono font-black text-emerald-600 scale-110 inline-block mx-0.5">$1</span>');
     
     return (
       <Component 
@@ -36,11 +36,18 @@ export default function MathText({ text, className, as: Component = 'span', isHt
 
   // Plain text processing
   const renderTextWithDigits = (rawText: string) => {
-    const textParts = rawText.split(digitRegex);
+    const textParts = rawText.split(/(\d+|\+|-|=|>|<|\*|\/|\^|√)/g);
     return textParts.map((part, index) => {
-      if (digitRegex.test(part)) {
+      if (/^\d+$/.test(part)) {
         return (
-          <span key={index} className="font-mono font-bold text-[1.05em] text-stone-800">
+          <span key={index} className="font-mono font-medium text-[1.1em] text-emerald-700 bg-emerald-50/50 px-0.5 rounded leading-none">
+            {part}
+          </span>
+        );
+      }
+      if (/^(\+|-|=|>|<|\*|\/|\^|√)$/.test(part)) {
+        return (
+          <span key={index} className="font-mono font-black text-emerald-600 scale-110 inline-block mx-0.5">
             {part}
           </span>
         );

@@ -138,22 +138,91 @@ async function initDb(forceReinstall = false) {
         avatar TEXT,
         contact_info TEXT,
         bio TEXT,
+        subscription_tier TEXT DEFAULT 'free',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
-    // Migration: Add contact_info and bio if they don't exist (for existing databases)
-    try {
-      await client.exec("ALTER TABLE users ADD COLUMN contact_info TEXT");
-      console.log("Migration: Added 'contact_info' column to 'users' table.");
-    } catch (e) { /* ignore */ }
-    
-    try {
-      await client.exec("ALTER TABLE users ADD COLUMN bio TEXT");
-      console.log("Migration: Added 'bio' column to 'users' table.");
-    } catch (e) { /* ignore */ }
+    // Migration: Add new columns if they don't exist
+    const columnsToMigrate = [
+      { table: 'users', column: 'contact_info', type: 'TEXT' },
+      { table: 'users', column: 'bio', type: 'TEXT' },
+      { table: 'users', column: 'subscription_tier', type: 'TEXT DEFAULT \'free\'' }
+    ];
+
+    for (const col of columnsToMigrate) {
+      try {
+        await client.exec(`ALTER TABLE ${col.table} ADD COLUMN ${col.column} ${col.type}`);
+        console.log(`Migration: Added '${col.column}' column to '${col.table}' table.`);
+      } catch (e) { /* ignore if already exists */ }
+    }
 
     console.log("Table 'users' ready.");
+
+    // ... (keep existing users logic) ...
+
+    await client.exec(`
+      -- ... (existing tables) ...
+
+      CREATE TABLE IF NOT EXISTS courses (
+        id TEXT PRIMARY KEY,
+        subject_id TEXT REFERENCES subjects(id),
+        title_ru TEXT,
+        title_tyv TEXT,
+        description_ru TEXT,
+        description_tyv TEXT,
+        created_by TEXT REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS lectures (
+        id TEXT PRIMARY KEY,
+        course_id TEXT REFERENCES courses(id) ON DELETE CASCADE,
+        title_ru TEXT,
+        title_tyv TEXT,
+        content_ru TEXT,
+        content_tyv TEXT,
+        order_index INTEGER,
+        is_free INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS lecture_comments (
+        id TEXT PRIMARY KEY,
+        lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
+        user_id TEXT REFERENCES users(id),
+        username TEXT,
+        avatar TEXT,
+        content TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS lecture_quizzes (
+        id TEXT PRIMARY KEY,
+        lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
+        title_ru TEXT,
+        title_tyv TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS quiz_questions (
+        id TEXT PRIMARY KEY,
+        quiz_id TEXT REFERENCES lecture_quizzes(id) ON DELETE CASCADE,
+        question_ru TEXT,
+        question_tyv TEXT,
+        explanation_ru TEXT,
+        explanation_tyv TEXT,
+        order_index INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS quiz_options (
+        id TEXT PRIMARY KEY,
+        question_id TEXT REFERENCES quiz_questions(id) ON DELETE CASCADE,
+        text_ru TEXT,
+        text_tyv TEXT,
+        is_correct INTEGER DEFAULT 0
+      );
+    `);
 
     await client.query(`
       INSERT INTO users (id, username, email, role, full_name) 
@@ -370,12 +439,135 @@ async function startServer() {
   app.use("/api/auth/forgot-password", authLimiter);
 
   // API Routes
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
+  // Middlewares
+  const authenticateToken = (req: any, res: any, next: any) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+      if (err) return res.status(403).json({ error: "Forbidden" });
+      req.user = user;
+      next();
+    });
+  };
+
+  const requirePro = async (req: any, res: any, next: any) => {
+    if (!req.user) return res.status(401).json({ error: "Unauthorized" });
+    const userRes = await pool.query("SELECT subscription_tier, role FROM users WHERE id = $1", [req.user.id]);
+    const user = userRes.rows[0];
+    if (user.subscription_tier === 'pro' || user.role === 'super_admin' || user.role === 'chief_editor') {
+      next();
+    } else {
+      res.status(403).json({ error: "Pro subscription required", is_pro_needed: true });
+    }
+  };
+
+  // ... (existing helper functions) ...
+
+  // +++ EDUCATIONAL COURSES & LECTURES API +++
+  app.get("/api/courses", async (req, res) => {
+    try {
+      const coursesRes = await pool.query(`
+        SELECT c.*, s.name_ru as subject_name_ru, s.name_tyv as subject_name_tyv 
+        FROM courses c 
+        LEFT JOIN subjects s ON c.subject_id = s.id 
+        ORDER BY c.created_at DESC
+      `);
+      res.json(coursesRes.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch courses" });
+    }
   });
 
-  // Auth API
-  // Verify SMTP on startup
+  app.get("/api/courses/:id/lectures", async (req, res) => {
+    try {
+      const lecturesRes = await pool.query(
+        "SELECT id, title_ru, title_tyv, order_index, is_free FROM lectures WHERE course_id = $1 ORDER BY order_index ASC",
+        [req.params.id]
+      );
+      res.json(lecturesRes.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch lectures" });
+    }
+  });
+
+  app.get("/api/lectures/:id", authenticateToken, async (req, res) => {
+    try {
+      const lectureRes = await pool.query("SELECT * FROM lectures WHERE id = $1", [req.params.id]);
+      const lecture = lectureRes.rows[0];
+      if (!lecture) return res.status(404).json({ error: "Lecture not found" });
+
+      if (lecture.is_free === 1) {
+        return res.json(lecture);
+      }
+
+      // Check Pro status
+      const userRes = await pool.query("SELECT subscription_tier, role FROM users WHERE id = $1", [(req as any).user.id]);
+      const user = userRes.rows[0];
+      if (user.subscription_tier === 'pro' || user.role === 'super_admin' || user.role === 'chief_editor') {
+        res.json(lecture);
+      } else {
+        res.status(403).json({ error: "Pro subscription required", is_pro_needed: true });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch lecture" });
+    }
+  });
+
+  app.get("/api/lectures/:id/comments", async (req, res) => {
+    try {
+      const commentsRes = await pool.query("SELECT * FROM lecture_comments WHERE lecture_id = $1 ORDER BY created_at ASC", [req.params.id]);
+      res.json(commentsRes.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch lecture comments" });
+    }
+  });
+
+  app.post("/api/lectures/:id/comments", authenticateToken, async (req, res) => {
+    const { content } = req.body;
+    const id = Math.random().toString(36).substr(2, 9);
+    try {
+      // Get user info
+      const userRes = await pool.query("SELECT username, avatar FROM users WHERE id = $1", [(req as any).user.id]);
+      const user = userRes.rows[0];
+      
+      await pool.query(
+        "INSERT INTO lecture_comments (id, lecture_id, user_id, username, avatar, content) VALUES ($1, $2, $3, $4, $5, $6)",
+        [id, req.params.id, (req as any).user.id, user.username, user.avatar, content]
+      );
+      res.json({ id, success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to post comment" });
+    }
+  });
+
+  app.get("/api/lectures/:id/quiz", async (req, res) => {
+    try {
+      const quizRes = await pool.query("SELECT * FROM lecture_quizzes WHERE lecture_id = $1", [req.params.id]);
+      const quiz = quizRes.rows[0];
+      if (!quiz) return res.json(null);
+
+      const questionsRes = await pool.query("SELECT * FROM quiz_questions WHERE quiz_id = $1 ORDER BY order_index ASC", [quiz.id]);
+      const questions = questionsRes.rows;
+
+      for (const q of questions) {
+        const optionsRes = await pool.query("SELECT id, text_ru, text_tyv, is_correct FROM quiz_options WHERE question_id = $1", [q.id]);
+        (q as any).options = optionsRes.rows;
+      }
+
+      res.json({ ...quiz, questions });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch quiz" });
+    }
+  });
+
+  async function isUserPro(userId: string) {
+    const res = await pool.query("SELECT subscription_tier, role FROM users WHERE id = $1", [userId]);
+    const u = res.rows[0];
+    return u && (u.subscription_tier === 'pro' || u.role === 'super_admin' || u.role === 'chief_editor');
+  }
+
+  // --- (existing auth routes) ---
   if (process.env.SMTP_USER && process.env.SMTP_PASS) {
     primaryTransporter.verify((error) => {
       if (error) {
