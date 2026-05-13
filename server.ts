@@ -561,6 +561,39 @@ async function startServer() {
     }
   });
 
+  // +++ EDUCATIONAL COURSES & LECTURES API (MANAGEMENT) +++
+  app.post("/api/courses", authenticateToken, requirePro, async (req, res) => {
+    const { subject_id, title_ru, title_tyv, description_ru, description_tyv } = req.body;
+    const id = Math.random().toString(36).substr(2, 9);
+    try {
+      await pool.query(
+        "INSERT INTO courses (id, subject_id, title_ru, title_tyv, description_ru, description_tyv, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        [id, subject_id, title_ru, title_tyv, description_ru, description_tyv, (req as any).user.id]
+      );
+      res.json({ id, success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create course" });
+    }
+  });
+
+  app.post("/api/lectures", authenticateToken, requirePro, async (req, res) => {
+    const { course_id, title_ru, title_tyv, content_ru, content_tyv, is_free } = req.body;
+    const id = Math.random().toString(36).substr(2, 9);
+    try {
+      // Get max order_index
+      const orderRes = await pool.query("SELECT COALESCE(MAX(order_index), 0) as max_idx FROM lectures WHERE course_id = $1", [course_id]);
+      const nextIdx = (parseInt(orderRes.rows[0].max_idx) || 0) + 1;
+
+      await pool.query(
+        "INSERT INTO lectures (id, course_id, title_ru, title_tyv, content_ru, content_tyv, order_index, is_free) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        [id, course_id, title_ru, title_tyv, content_ru, content_tyv, nextIdx, is_free ? 1 : 0]
+      );
+      res.json({ id, success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create lecture" });
+    }
+  });
+
   async function isUserPro(userId: string) {
     const res = await pool.query("SELECT subscription_tier, role FROM users WHERE id = $1", [userId]);
     const u = res.rows[0];

@@ -278,5 +278,21 @@ export const api = {
   async getLectureQuiz(lectureId: string) {
     const res = await fetch(`/api/lectures/${lectureId}/quiz`);
     return handleResponse(res);
+  },
+  async createCourse(data: any) {
+    const res = await fetch('/api/courses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+  async createLecture(data: any) {
+    const res = await fetch('/api/lectures', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
   }
 };
