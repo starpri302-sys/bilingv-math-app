@@ -27,9 +27,10 @@ interface QuizProps {
     questions: QuizQuestion[];
   };
   lang: 'ru' | 'tyv';
+  onComplete?: (score: number, max: number) => void;
 }
 
-export default function LectureQuiz({ quiz, lang }: QuizProps) {
+export default function LectureQuiz({ quiz, lang, onComplete }: QuizProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
@@ -38,15 +39,19 @@ export default function LectureQuiz({ quiz, lang }: QuizProps) {
 
   const currentQuestion = quiz.questions[currentStep];
 
-  const handleOptionSelect = (optionId: string) => {
+  const handleOptionSelect = (optionId: string | number) => {
     if (isAnswered) return;
-    setSelectedOption(optionId);
+    setSelectedOption(String(optionId));
   };
 
   const handleCheck = () => {
-    if (!selectedOption) return;
+    if (selectedOption === null) return;
     
-    const isCorrect = currentQuestion.options.find(o => o.id === selectedOption)?.is_correct === 1;
+    const question = quiz.questions[currentStep];
+    const option = question.options.find(o => String(o.id) === selectedOption || o.text_ru === selectedOption);
+    
+    const isCorrect = option ? (Number(option.is_correct) === 1 || (option.is_correct as any) === true) : false;
+    
     if (isCorrect) {
       setScore(s => s + 1);
     }
@@ -60,6 +65,9 @@ export default function LectureQuiz({ quiz, lang }: QuizProps) {
       setIsAnswered(false);
     } else {
       setShowResult(true);
+      if (onComplete) {
+        onComplete(score, quiz.questions.length);
+      }
     }
   };
 
@@ -131,14 +139,15 @@ export default function LectureQuiz({ quiz, lang }: QuizProps) {
             {lang === 'ru' ? `Вопрос ${currentStep + 1}` : `${currentStep + 1}-ги айтырыг`}
           </div>
           <h3 className="text-xl sm:text-2xl font-bold text-stone-900 leading-tight">
-            <MathText text={lang === 'ru' ? currentQuestion.question_ru : currentQuestion.question_tyv} />
+            <MathText text={lang === 'ru' ? (currentQuestion.question_ru || (currentQuestion as any).text_ru) : (currentQuestion.question_tyv || (currentQuestion as any).text_tyv)} />
           </h3>
         </div>
 
         <div className="space-y-3">
-          {currentQuestion.options.map((option) => {
-            const isCorrect = option.is_correct === 1;
-            const isSelected = selectedOption === option.id;
+          {currentQuestion.options.map((option, oIdx) => {
+            const isCorrect = Number(option.is_correct) === 1 || (option.is_correct as any) === true;
+            const optionKey = option.id || `opt-${oIdx}`;
+            const isSelected = selectedOption === String(optionKey);
             
             let bgClass = 'bg-stone-50 border-stone-100 hover:border-emerald-200';
             let textClass = 'text-stone-700';
@@ -163,8 +172,8 @@ export default function LectureQuiz({ quiz, lang }: QuizProps) {
 
             return (
               <button
-                key={option.id}
-                onClick={() => handleOptionSelect(option.id)}
+                key={optionKey}
+                onClick={() => handleOptionSelect(optionKey)}
                 disabled={isAnswered}
                 className={`w-full flex items-center justify-between gap-4 p-5 rounded-2xl border-2 transition-all text-left ${bgClass}`}
               >

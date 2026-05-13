@@ -10,7 +10,8 @@ import {
   ChevronRight, 
   FileText,
   MessageSquare,
-  Send
+  Send,
+  CheckCircle2
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../store/authContext';
@@ -56,7 +57,19 @@ export default function LectureDetail() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [completed, setCompleted] = useState(false);
   const { user, profile } = useAuth();
+
+  const fetchProgress = async () => {
+    if (!user) return;
+    try {
+      const data = await api.getUserProgress();
+      const isDone = data.some((p: any) => p.lecture_id === id);
+      setCompleted(isDone);
+    } catch (err) {
+      console.error('Failed to fetch progress:', err);
+    }
+  };
 
   const fetchComments = async () => {
     try {
@@ -83,6 +96,7 @@ export default function LectureDetail() {
         setLecture(data);
         fetchComments();
         fetchQuiz();
+        fetchProgress();
       } catch (err: any) {
         if (err.message.includes('Pro subscription required')) {
           setIsProNeeded(true);
@@ -109,6 +123,16 @@ export default function LectureDetail() {
       console.error('Failed to post comment:', err);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleComplete = async (score?: number, max?: number) => {
+    if (!user) return;
+    try {
+      await api.completeLecture(id!, { score, max_score: max });
+      setCompleted(true);
+    } catch (err) {
+      console.error('Failed to complete lecture:', err);
     }
   };
 
@@ -219,10 +243,22 @@ export default function LectureDetail() {
                   <BookOpen className="w-5 h-5" />
                 </div>
                 <h4 className="font-bold mb-2">Прогресс обучения</h4>
-                <p className="text-stone-400 text-sm mb-4">Отметьте лекцию как изученную.</p>
-                <button className="w-full bg-emerald-600 text-white rounded-xl py-3 text-xs font-bold hover:bg-emerald-700 transition-all">
-                  Отметить как пройденную
-                </button>
+                <p className="text-stone-400 text-sm mb-4">
+                  {completed ? 'Вы успешно изучили этот материал!' : 'Отметьте лекцию как изученную.'}
+                </p>
+                {completed ? (
+                  <div className="w-full bg-emerald-600/20 text-emerald-400 rounded-xl py-3 text-xs font-black flex items-center justify-center gap-2 border border-emerald-600/30">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Пройдено
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => handleComplete()}
+                    className="w-full bg-emerald-600 text-white rounded-xl py-3 text-xs font-bold hover:bg-emerald-700 transition-all active:scale-95"
+                  >
+                    Отметить как пройденную
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -231,7 +267,11 @@ export default function LectureDetail() {
         {/* Quiz Section */}
         {quiz && quiz.questions && quiz.questions.length > 0 && (
           <div className="mt-16">
-            <LectureQuiz quiz={quiz} lang={lang} />
+            <LectureQuiz 
+              quiz={quiz} 
+              lang={lang} 
+              onComplete={(score, max) => handleComplete(score, max)} 
+            />
           </div>
         )}
 

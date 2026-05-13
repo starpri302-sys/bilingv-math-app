@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { GraduationCap, BookOpen, Clock, ChevronRight, Lock, Sparkles, Search, Plus, X, ChevronLeft, FileText } from 'lucide-react';
+import { GraduationCap, BookOpen, Clock, ChevronRight, Lock, Sparkles, Search, Plus, X, ChevronLeft, FileText, CheckCircle2, Edit3, Trash2, Trophy, BarChart3 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../store/authContext';
 import SEO from '../components/SEO';
@@ -23,8 +23,11 @@ interface Lecture {
   id: string;
   title_ru: string;
   title_tyv: string;
+  content_ru: string;
+  content_tyv: string;
   order_index: number;
   is_free: number;
+  quiz?: any;
 }
 
 export default function Courses() {
@@ -41,23 +44,33 @@ export default function Courses() {
   const [showLectureEditor, setShowLectureEditor] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newCourse, setNewCourse] = useState({ title_ru: '', title_tyv: '', desc_ru: '', desc_tyv: '', subject_id: '' });
-  
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [showStats, setShowStats] = useState(false);
+  const [stats, setStats] = useState<any[]>([]);
+
   // Detail States
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [lectures, setLectures] = useState<Lecture[]>([]);
+  const [userProgress, setUserProgress] = useState<string[]>([]);
   const [lecturesLoading, setLecturesLoading] = useState(false);
+  const [editingLecture, setEditingLecture] = useState<Lecture | null>(null);
 
-  const { isPro } = useAuth();
+  const { isPro, user, profile } = useAuth();
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [coursesData, subjectsData] = await Promise.all([
+      const [coursesData, subjectsData, progressData] = await Promise.all([
         api.getCourses(),
-        api.getSubjects()
+        api.getSubjects(),
+        user ? api.getUserProgress() : Promise.resolve([])
       ]);
       setCourses(coursesData);
       setSubjects(subjectsData);
+      if (Array.isArray(progressData)) {
+        setUserProgress(progressData.map((p: any) => p.lecture_id));
+      }
     } catch (err) {
       console.error('Failed to fetch data:', err);
     } finally {
@@ -102,42 +115,97 @@ export default function Courses() {
     }
   }, [id, courses, loading]);
 
+  useEffect(() => {
+    if (id && selectedCourse) {
+      const fetchStats = async () => {
+        try {
+          const data = await api.getCourseStats(id);
+          setStats(data);
+        } catch (e) {}
+      };
+      if (showStats) fetchStats();
+    }
+  }, [id, selectedCourse, showStats]);
+
   const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCourse.title_ru || !newCourse.subject_id) return;
     setIsSubmitting(true);
     try {
-      await api.createCourse({
-        subject_id: newCourse.subject_id,
-        title_ru: newCourse.title_ru,
-        title_tyv: newCourse.title_tyv,
-        description_ru: newCourse.desc_ru,
-        description_tyv: newCourse.desc_tyv
-      });
+      if (editingCourse) {
+        await api.updateCourse(editingCourse.id, {
+          subject_id: newCourse.subject_id,
+          title_ru: newCourse.title_ru,
+          title_tyv: newCourse.title_tyv,
+          description_ru: newCourse.desc_ru,
+          description_tyv: newCourse.desc_tyv
+        });
+      } else {
+        await api.createCourse({
+          subject_id: newCourse.subject_id,
+          title_ru: newCourse.title_ru,
+          title_tyv: newCourse.title_tyv,
+          description_ru: newCourse.desc_ru,
+          description_tyv: newCourse.desc_tyv
+        });
+      }
       setShowCreateModal(false);
+      setEditingCourse(null);
       setNewCourse({ title_ru: '', title_tyv: '', desc_ru: '', desc_tyv: '', subject_id: '' });
       fetchData();
     } catch (err) {
-      console.error('Failed to create course:', err);
+      console.error('Failed to save course:', err);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleCreateLecture = async (data: { title_ru: string; title_tyv: string; content_ru: string; content_tyv: string; is_free: boolean }) => {
+  const handleDeleteCourse = async (id: string) => {
+    try {
+      await api.deleteCourse(id);
+      setShowDeleteConfirm(null);
+      fetchData();
+    } catch (err) {
+      console.error('Failed to delete course:', err);
+    }
+  };
+
+  const handleCreateLecture = async (data: any) => {
     if (!id) return;
     setIsSubmitting(true);
     try {
-      await api.createLecture({
-        course_id: id,
-        ...data
-      });
+      let lectureId = editingLecture?.id;
+      if (editingLecture) {
+        await api.updateLecture(editingLecture.id, data);
+      } else {
+        const res = await api.createLecture({
+          course_id: id,
+          ...data
+        });
+        lectureId = res.id;
+      }
+
+      if (lectureId && data.quiz) {
+        await api.saveLectureQuiz(lectureId, data.quiz);
+      }
+
       setShowLectureEditor(false);
+      setEditingLecture(null);
       fetchCourseLectures(id);
     } catch (err) {
-      console.error('Failed to create lecture:', err);
+      console.error('Failed to save lecture:', err);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteLecture = async (lectureId: string) => {
+    if (!window.confirm('Вы уверены, что хотите удалить эту лекцию?')) return;
+    try {
+      await api.deleteLecture(lectureId);
+      fetchCourseLectures(id!);
+    } catch (err) {
+      console.error('Failed to delete lecture:', err);
     }
   };
 
@@ -176,12 +244,95 @@ export default function Courses() {
                </span>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl font-serif font-black text-stone-900 mb-6 leading-tight">
-              {selectedCourse.title_ru}
-            </h1>
-            <p className="text-stone-500 text-lg leading-relaxed max-w-2xl">
-              {selectedCourse.description_ru}
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+              <div className="flex-grow">
+                <h1 className="text-4xl sm:text-5xl font-serif font-black text-stone-900 mb-6 leading-tight">
+                  {selectedCourse.title_ru}
+                </h1>
+                <p className="text-stone-500 text-lg leading-relaxed max-w-2xl">
+                  {selectedCourse.description_ru}
+                </p>
+              </div>
+              {isPro && (
+                <div className="flex sm:flex-col gap-2">
+                   <button 
+                     onClick={() => {
+                        setEditingCourse(selectedCourse);
+                        setNewCourse({
+                          title_ru: selectedCourse.title_ru,
+                          title_tyv: selectedCourse.title_tyv,
+                          desc_ru: selectedCourse.description_ru,
+                          desc_tyv: selectedCourse.description_tyv,
+                          subject_id: selectedCourse.subject_id
+                        });
+                        setShowCreateModal(true);
+                     }}
+                     className="flex items-center justify-center gap-2 bg-stone-100 text-stone-600 px-5 py-3 rounded-xl font-bold hover:bg-stone-200 transition-all text-xs uppercase tracking-widest"
+                   >
+                     <Edit3 className="w-4 h-4" />
+                     Изменить
+                   </button>
+                   <button 
+                     onClick={() => setShowStats(!showStats)}
+                     className={`flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold transition-all text-xs uppercase tracking-widest ${showStats ? 'bg-emerald-600 text-white shadow-lg' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
+                   >
+                     <BarChart3 className="w-4 h-4" />
+                     {showStats ? 'Скрыть отчет' : 'Прогресс учеников'}
+                   </button>
+                </div>
+              )}
+            </div>
+
+            {showStats && isPro && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="mt-12 overflow-hidden"
+              >
+                <div className="bg-stone-50 border border-stone-200 rounded-3xl p-8">
+                   <div className="flex items-center gap-3 mb-8">
+                      <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
+                        <Trophy className="w-5 h-5" />
+                      </div>
+                      <h3 className="text-xl font-serif font-black text-stone-900">Успеваемость курса</h3>
+                   </div>
+                   
+                   <div className="space-y-4">
+                      {stats.length > 0 ? stats.map((stat, i) => (
+                        <div key={i} className="flex flex-wrap items-center justify-between gap-4 p-4 bg-white border border-stone-100 rounded-2xl">
+                           <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 font-bold border border-emerald-100">
+                                {stat.username[0].toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-bold text-stone-900">{stat.username}</p>
+                                <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">{stat.lecture_title}</p>
+                              </div>
+                           </div>
+                           <div className="flex items-center gap-8">
+                             <div className="text-center">
+                               <p className="text-[10px] text-stone-400 font-black uppercase tracking-widest mb-1">Оценка</p>
+                               <span className={`text-sm font-black ${stat.score / stat.max_score > 0.8 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                 {stat.score} / {stat.max_score}
+                               </span>
+                             </div>
+                             <div className="text-right">
+                               <p className="text-[10px] text-stone-400 font-black uppercase tracking-widest mb-1">Дата</p>
+                               <span className="text-xs text-stone-500 font-medium">
+                                 {new Date(stat.completed_at).toLocaleDateString()}
+                               </span>
+                             </div>
+                           </div>
+                        </div>
+                      )) : (
+                        <div className="text-center py-10 text-stone-400 font-medium italic">
+                          Никто еще не прошел этот курс.
+                        </div>
+                      )}
+                   </div>
+                </div>
+              </motion.div>
+            )}
 
             {isPro && !showLectureEditor && (
               <div className="mt-10 pt-10 border-t border-stone-100 flex justify-between items-center">
@@ -216,7 +367,16 @@ export default function Courses() {
                   Отменить создание
                 </button>
               </div>
-              <LectureEditor onSave={handleCreateLecture} isSubmitting={isSubmitting} />
+              <LectureEditor 
+                onSave={handleCreateLecture} 
+                isSubmitting={isSubmitting} 
+                initialTitleRu={editingLecture?.title_ru}
+                initialTitleTyv={editingLecture?.title_tyv}
+                initialContentRu={editingLecture?.content_ru}
+                initialContentTyv={editingLecture?.content_tyv}
+                initialIsFree={editingLecture?.is_free === 1}
+                initialQuiz={editingLecture?.quiz}
+              />
             </motion.div>
           ) : (
             <div className="space-y-6">
@@ -229,50 +389,85 @@ export default function Courses() {
                  <div className="space-y-4">
                    {[1, 2, 3].map(i => <div key={i} className="h-20 bg-white rounded-2xl animate-pulse border border-stone-100" />)}
                  </div>
-               ) : lectures.map((lecture, idx) => (
-                 <motion.div
-                   key={lecture.id}
-                   initial={{ opacity: 0, x: -20 }}
-                   animate={{ opacity: 1, x: 0 }}
-                   transition={{ delay: idx * 0.05 }}
-                   className="group relative"
-                 >
-                    <Link 
-                      to={`/lectures/${lecture.id}`}
-                      className="block bg-white rounded-3xl border border-stone-200 p-6 sm:p-8 hover:shadow-xl hover:border-emerald-100 transition-all duration-300 relative overflow-hidden"
-                    >
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -mr-16 -mt-16 opacity-0 group-hover:opacity-100 transition-all duration-500 scale-0 group-hover:scale-100" />
-                      
-                      <div className="flex items-center gap-6 relative">
-                        <div className="w-12 h-12 bg-stone-50 rounded-2xl flex items-center justify-center text-stone-300 font-mono font-black border border-stone-100 group-hover:bg-emerald-50 group-hover:text-emerald-500 transition-colors">
-                          {idx + 1}
+               ) : (
+                  <div className="space-y-4">
+                    {lectures.map((lecture, idx) => (
+                      <motion.div
+                        key={lecture.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className="group relative"
+                      >
+                        <div className="flex gap-4">
+                          <Link 
+                            to={`/lectures/${lecture.id}`}
+                            className="flex-grow block bg-white rounded-3xl border border-stone-200 p-6 sm:p-8 hover:shadow-xl hover:border-emerald-100 transition-all duration-300 relative overflow-hidden"
+                          >
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -mr-16 -mt-16 opacity-0 group-hover:opacity-100 transition-all duration-500 scale-0 group-hover:scale-100" />
+                            
+                            <div className="flex items-center gap-6 relative">
+                              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-mono font-black border transition-colors ${userProgress.includes(lecture.id) ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-stone-50 text-stone-300 border-stone-100 group-hover:bg-emerald-50 group-hover:text-emerald-500'}`}>
+                                {userProgress.includes(lecture.id) ? <CheckCircle2 className="w-6 h-6" /> : idx + 1}
+                              </div>
+                              <div className="flex-grow">
+                                <h3 className="text-lg sm:text-xl font-bold text-stone-900 mb-1 group-hover:text-emerald-600 transition-colors">
+                                  {lecture.title_ru}
+                                </h3>
+                                <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-1.5 text-[10px] font-black text-stone-400 uppercase tracking-widest">
+                                    <FileText className="w-3.5 h-3.5" />
+                                    Лекция
+                                  </div>
+                                  {lecture.is_free === 1 ? (
+                                    <span className="text-[10px] font-black text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-md uppercase tracking-widest">Бесплатно</span>
+                                  ) : (
+                                    <span className="text-[10px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md uppercase tracking-widest flex items-center gap-1">
+                                      <Sparkles className="w-3 h-3" />
+                                      Pro
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="shrink-0 text-stone-300 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all">
+                                <ChevronRight className="w-6 h-6" />
+                              </div>
+                            </div>
+                          </Link>
+                          {isPro && (
+                            <div className="flex flex-col gap-2">
+                              <button 
+                                onClick={() => {
+                                  const loadAndEdit = async () => {
+                                    const fullLec = await api.getLecture(lecture.id);
+                                    let fullQuiz = null;
+                                    try {
+                                      fullQuiz = await api.getLectureQuiz(lecture.id);
+                                    } catch (e) {
+                                      console.warn('No quiz found for lecture');
+                                    }
+                                    setEditingLecture({ ...fullLec, quiz: fullQuiz });
+                                    setShowLectureEditor(true);
+                                  };
+                                  loadAndEdit();
+                                }}
+                                className="p-4 bg-white border border-stone-200 rounded-2xl text-stone-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
+                              >
+                                <Edit3 className="w-5 h-5" />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteLecture(lecture.id)}
+                                className="p-4 bg-white border border-stone-200 rounded-2xl text-stone-400 hover:text-rose-600 hover:border-rose-100 transition-all shadow-sm"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </button>
+                            </div>
+                          )}
                         </div>
-                        <div className="flex-grow">
-                          <h3 className="text-lg sm:text-xl font-bold text-stone-900 mb-1 group-hover:text-emerald-600 transition-colors">
-                            {lecture.title_ru}
-                          </h3>
-                          <div className="flex items-center gap-3">
-                             <div className="flex items-center gap-1.5 text-[10px] font-black text-stone-400 uppercase tracking-widest">
-                               <FileText className="w-3.5 h-3.5" />
-                               Лекция
-                             </div>
-                             {lecture.is_free === 1 ? (
-                               <span className="text-[10px] font-black text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-md uppercase tracking-widest">Бесплатно</span>
-                             ) : (
-                               <span className="text-[10px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md uppercase tracking-widest flex items-center gap-1">
-                                 <Sparkles className="w-3 h-3" />
-                                 Pro
-                               </span>
-                             )}
-                          </div>
-                        </div>
-                        <div className="shrink-0 text-stone-300 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all">
-                          <ChevronRight className="w-6 h-6" />
-                        </div>
-                      </div>
-                    </Link>
-                 </motion.div>
-               ))}
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
 
                {lectures.length === 0 && !lecturesLoading && (
                  <div className="text-center py-20 bg-white rounded-[3rem] border border-stone-200">
@@ -365,7 +560,9 @@ export default function Courses() {
             </button>
             
             <div className="p-8 sm:p-12">
-              <h2 className="text-3xl font-serif font-black text-stone-900 mb-8">Новый курс</h2>
+              <h2 className="text-3xl font-serif font-black text-stone-900 mb-8">
+                {editingCourse ? 'Редактировать курс' : 'Новый курс'}
+              </h2>
               <form onSubmit={handleCreateCourse} className="space-y-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Дисциплина</label>
@@ -414,11 +611,41 @@ export default function Courses() {
                   disabled={isSubmitting}
                   className="w-full bg-stone-900 text-white rounded-2xl py-5 font-black hover:bg-emerald-600 transition-all disabled:opacity-50 uppercase tracking-widest text-xs"
                 >
-                  {isSubmitting ? 'Создание...' : 'Создать курс'}
+                  {isSubmitting ? 'Сохранение...' : (editingCourse ? 'Сохранить изменения' : 'Создать курс')}
                 </button>
               </form>
             </div>
           </motion.div>
+        </div>
+      )}
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-md">
+           <motion.div 
+             initial={{ opacity: 0, scale: 0.9 }}
+             animate={{ opacity: 1, scale: 1 }}
+             className="bg-white rounded-[2rem] p-8 max-w-sm text-center shadow-2xl"
+           >
+              <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto mb-6 text-rose-500">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-serif font-black text-stone-900 mb-2">Удалить курс?</h3>
+              <p className="text-stone-500 text-sm mb-8">Это действие необратимо и удалит все лекции внутри этого курса.</p>
+              <div className="grid grid-cols-2 gap-4">
+                <button 
+                  onClick={() => setShowDeleteConfirm(null)}
+                  className="bg-stone-50 border border-stone-200 text-stone-600 py-4 rounded-xl font-bold hover:bg-stone-100 transition-all"
+                >
+                  Отмена
+                </button>
+                <button 
+                  onClick={() => handleDeleteCourse(showDeleteConfirm)}
+                  className="bg-rose-600 text-white py-4 rounded-xl font-bold hover:bg-rose-700 transition-all shadow-lg shadow-rose-200"
+                >
+                  Удалить
+                </button>
+              </div>
+           </motion.div>
         </div>
       )}
 
@@ -444,7 +671,38 @@ export default function Courses() {
                     <div className="p-3 bg-stone-50 rounded-2xl border border-stone-100 text-emerald-600">
                       <BookOpen className="w-6 h-6" />
                     </div>
-                    {!isPro && (
+                    {isPro ? (
+                       <div className="flex items-center gap-2">
+                          <button 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setEditingCourse(course);
+                              setNewCourse({
+                                title_ru: course.title_ru,
+                                title_tyv: course.title_tyv,
+                                desc_ru: course.description_ru,
+                                desc_tyv: course.description_tyv,
+                                subject_id: course.subject_id
+                              });
+                              setShowCreateModal(true);
+                            }}
+                            className="p-2 bg-stone-50 rounded-xl text-stone-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setShowDeleteConfirm(course.id);
+                            }}
+                            className="p-2 bg-stone-50 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                       </div>
+                    ) : (
                       <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-600 rounded-xl border border-amber-100 text-[10px] font-black uppercase tracking-widest">
                         <Lock className="w-3 h-3" />
                         Pro

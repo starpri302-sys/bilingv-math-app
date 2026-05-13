@@ -197,6 +197,16 @@ async function initDb(forceReinstall = false) {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS lecture_completions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT REFERENCES users(id),
+        lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
+        score INTEGER,
+        max_score INTEGER,
+        completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, lecture_id)
+      );
+
       CREATE TABLE IF NOT EXISTS lecture_quizzes (
         id TEXT PRIMARY KEY,
         lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
@@ -541,6 +551,46 @@ async function startServer() {
     }
   });
 
+  app.post("/api/lectures/:id/complete", authenticateToken, async (req, res) => {
+    const { score, max_score } = req.body;
+    const id = Math.random().toString(36).substr(2, 9);
+    try {
+      await pool.query(`
+        INSERT INTO lecture_completions (id, user_id, lecture_id, score, max_score) 
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (user_id, lecture_id) DO UPDATE SET score = $4, max_score = $5, completed_at = CURRENT_TIMESTAMP
+      `, [id, (req as any).user.id, req.params.id, score || 0, max_score || 0]);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to save completion" });
+    }
+  });
+
+  app.get("/api/users/me/progress", authenticateToken, async (req, res) => {
+    try {
+      const progressRes = await pool.query("SELECT * FROM lecture_completions WHERE user_id = $1", [(req as any).user.id]);
+      res.json(progressRes.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch progress" });
+    }
+  });
+
+  app.get("/api/courses/:id/stats", authenticateToken, requirePro, async (req, res) => {
+    try {
+      const statsRes = await pool.query(`
+        SELECT lc.*, u.username, u.avatar, l.title_ru as lecture_title
+        FROM lecture_completions lc
+        JOIN users u ON lc.user_id = u.id
+        JOIN lectures l ON lc.lecture_id = l.id
+        WHERE l.course_id = $1
+        ORDER BY lc.completed_at DESC
+      `, [req.params.id]);
+      res.json(statsRes.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
   app.get("/api/lectures/:id/quiz", async (req, res) => {
     try {
       const quizRes = await pool.query("SELECT * FROM lecture_quizzes WHERE lecture_id = $1", [req.params.id]);
@@ -576,6 +626,28 @@ async function startServer() {
     }
   });
 
+  app.put("/api/courses/:id", authenticateToken, requirePro, async (req, res) => {
+    const { subject_id, title_ru, title_tyv, description_ru, description_tyv } = req.body;
+    try {
+      await pool.query(
+        "UPDATE courses SET subject_id = $1, title_ru = $2, title_tyv = $3, description_ru = $4, description_tyv = $5 WHERE id = $6",
+        [subject_id, title_ru, title_tyv, description_ru, description_tyv, req.params.id]
+      );
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update course" });
+    }
+  });
+
+  app.delete("/api/courses/:id", authenticateToken, requirePro, async (req, res) => {
+    try {
+      await pool.query("DELETE FROM courses WHERE id = $1", [req.params.id]);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete course" });
+    }
+  });
+
   app.post("/api/lectures", authenticateToken, requirePro, async (req, res) => {
     const { course_id, title_ru, title_tyv, content_ru, content_tyv, is_free } = req.body;
     const id = Math.random().toString(36).substr(2, 9);
@@ -591,6 +663,86 @@ async function startServer() {
       res.json({ id, success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to create lecture" });
+    }
+  });
+
+  app.put("/api/lectures/:id", authenticateToken, requirePro, async (req, res) => {
+    const { title_ru, title_tyv, content_ru, content_tyv, is_free } = req.body;
+    try {
+      await pool.query(
+        "UPDATE lectures SET title_ru = $1, title_tyv = $2, content_ru = $3, content_tyv = $4, is_free = $5 WHERE id = $6",
+        [title_ru, title_tyv, content_ru, content_tyv, is_free ? 1 : 0, req.params.id]
+      );
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update lecture" });
+    }
+  });
+
+  app.delete("/api/lectures/:id", authenticateToken, requirePro, async (req, res) => {
+    try {
+      await pool.query("DELETE FROM lectures WHERE id = $1", [req.params.id]);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete lecture" });
+    }
+  });
+
+  app.post("/api/lectures/:id/quiz", authenticateToken, requirePro, async (req, res) => {
+    const lectureId = req.params.id;
+    const { questions } = req.body;
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      
+      // Upsert quiz
+      let quizId;
+      const existingQuiz = await client.query("SELECT id FROM lecture_quizzes WHERE lecture_id = $1", [lectureId]);
+      if (existingQuiz.rowCount > 0) {
+        quizId = existingQuiz.rows[0].id;
+      } else {
+        quizId = Math.random().toString(36).substr(2, 9);
+        await client.query(
+          "INSERT INTO lecture_quizzes (id, lecture_id) VALUES ($1, $2)",
+          [quizId, lectureId]
+        );
+      }
+
+      // Delete existing questions/options (simpler than syncing)
+      const qRes = await client.query("SELECT id FROM quiz_questions WHERE quiz_id = $1", [quizId]);
+      const qIds = qRes.rows.map(r => r.id);
+      if (qIds.length > 0) {
+        const placeholders = qIds.map((_, i) => `$${i + 1}`).join(',');
+        await client.query(`DELETE FROM quiz_options WHERE question_id IN (${placeholders})`, qIds);
+        await client.query("DELETE FROM quiz_questions WHERE quiz_id = $1", [quizId]);
+      }
+
+      // Add new questions
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        const questionId = Math.random().toString(36).substr(2, 9);
+        await client.query(
+          "INSERT INTO quiz_questions (id, quiz_id, text_ru, text_tyv, order_index) VALUES ($1, $2, $3, $4, $5)",
+          [questionId, quizId, q.text_ru, q.text_tyv, i]
+        );
+
+        for (const opt of q.options) {
+          const optionId = Math.random().toString(36).substr(2, 9);
+          await client.query(
+            "INSERT INTO quiz_options (id, question_id, text_ru, text_tyv, is_correct) VALUES ($1, $2, $3, $4, $5)",
+            [optionId, questionId, opt.text_ru, opt.text_tyv, opt.is_correct ? 1 : 0]
+          );
+        }
+      }
+
+      await client.query("COMMIT");
+      res.json({ success: true });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error('Quiz save error:', error);
+      res.status(500).json({ error: "Failed to save quiz" });
+    } finally {
+      client.release();
     }
   });
 

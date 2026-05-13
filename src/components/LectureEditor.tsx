@@ -1,14 +1,35 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Layout, Eye, Edit3, Send, ChevronRight, Info, AlertCircle } from 'lucide-react';
+import { Layout, Eye, Edit3, Send, ChevronRight, Info, AlertCircle, Plus, Trash2, CheckCircle2, HelpCircle } from 'lucide-react';
 import MathText from './MathText';
+
+interface QuizOption {
+  text_ru: string;
+  text_tyv: string;
+  is_correct: boolean;
+}
+
+interface QuizQuestion {
+  text_ru: string;
+  text_tyv: string;
+  options: QuizOption[];
+}
 
 interface EditorProps {
   initialTitleRu?: string;
   initialTitleTyv?: string;
   initialContentRu?: string;
   initialContentTyv?: string;
-  onSave: (data: { title_ru: string; title_tyv: string; content_ru: string; content_tyv: string; is_free: boolean }) => Promise<void>;
+  initialIsFree?: boolean;
+  initialQuiz?: { questions: QuizQuestion[] } | null;
+  onSave: (data: { 
+    title_ru: string; 
+    title_tyv: string; 
+    content_ru: string; 
+    content_tyv: string; 
+    is_free: boolean;
+    quiz?: { questions: QuizQuestion[] }
+  }) => Promise<void>;
   isSubmitting?: boolean;
 }
 
@@ -17,6 +38,8 @@ export default function LectureEditor({
   initialTitleTyv = '', 
   initialContentRu = '', 
   initialContentTyv = '', 
+  initialIsFree = true,
+  initialQuiz = null,
   onSave, 
   isSubmitting = false 
 }: EditorProps) {
@@ -24,9 +47,10 @@ export default function LectureEditor({
   const [titleTyv, setTitleTyv] = useState(initialTitleTyv);
   const [contentRu, setContentRu] = useState(initialContentRu);
   const [contentTyv, setContentTyv] = useState(initialContentTyv);
-  const [isFree, setIsFree] = useState(true);
-  const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
+  const [isFree, setIsFree] = useState(initialIsFree);
+  const [activeTab, setActiveTab] = useState<'edit' | 'preview' | 'quiz'>('edit');
   const [lang, setLang] = useState<'ru' | 'tyv'>('ru');
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(initialQuiz?.questions || []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,8 +59,47 @@ export default function LectureEditor({
       title_tyv: titleTyv,
       content_ru: contentRu,
       content_tyv: contentTyv,
-      is_free: isFree
+      is_free: isFree,
+      quiz: quizQuestions.length > 0 ? { questions: quizQuestions } : undefined
     });
+  };
+
+  const addQuestion = () => {
+    setQuizQuestions([...quizQuestions, {
+      text_ru: '',
+      text_tyv: '',
+      options: [
+        { text_ru: '', text_tyv: '', is_correct: true },
+        { text_ru: '', text_tyv: '', is_correct: false },
+        { text_ru: '', text_tyv: '', is_correct: false },
+        { text_ru: '', text_tyv: '', is_correct: false }
+      ]
+    }]);
+  };
+
+  const removeQuestion = (idx: number) => {
+    setQuizQuestions(quizQuestions.filter((_, i) => i !== idx));
+  };
+
+  const updateQuestion = (idx: number, field: keyof QuizQuestion, value: any) => {
+    const newQuestions = [...quizQuestions];
+    newQuestions[idx] = { ...newQuestions[idx], [field]: value };
+    setQuizQuestions(newQuestions);
+  };
+
+  const updateOption = (qIdx: number, oIdx: number, field: keyof QuizOption, value: any) => {
+    const newQuestions = [...quizQuestions];
+    const newOptions = [...newQuestions[qIdx].options];
+    
+    if (field === 'is_correct' && value === true) {
+      // Ensure only one correct option for now as per user request (though UI could support multiple)
+      newOptions.forEach((opt, i) => opt.is_correct = (i === oIdx));
+    } else {
+      newOptions[oIdx] = { ...newOptions[oIdx], [field]: value };
+    }
+    
+    newQuestions[qIdx].options = newOptions;
+    setQuizQuestions(newQuestions);
   };
 
   return (
@@ -64,6 +127,13 @@ export default function LectureEditor({
           >
             <Eye className="w-4 h-4" />
             Предпросмотр
+          </button>
+          <button
+            onClick={() => setActiveTab('quiz')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'quiz' ? 'bg-amber-600 text-white shadow-md' : 'text-stone-500 hover:text-stone-700'}`}
+          >
+            <HelpCircle className="w-4 h-4" />
+            Тест/Квиз
           </button>
         </div>
 
@@ -107,7 +177,7 @@ export default function LectureEditor({
         </div>
 
         {/* Input Area */}
-        <div className={`flex-grow flex flex-col p-6 sm:p-8 space-y-6 ${activeTab === 'preview' ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`flex-grow flex flex-col p-6 sm:p-8 space-y-6 ${activeTab !== 'edit' ? 'hidden md:flex' : 'flex'}`}>
            <div className="space-y-2">
              <label className="text-[10px] font-black text-stone-400 uppercase tracking-[0.2em]">Заголовок ({lang === 'ru' ? 'Рус' : 'Тув'})</label>
              <input 
@@ -136,8 +206,101 @@ export default function LectureEditor({
            </div>
         </div>
 
+        {/* Quiz Area */}
+        {activeTab === 'quiz' && (
+          <div className="flex-grow p-6 sm:p-8 space-y-8 overflow-y-auto max-h-[700px]">
+             <div className="flex items-center justify-between">
+                <div>
+                   <h3 className="text-xl font-serif font-black text-stone-900">Редактор тестов</h3>
+                   <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mt-1">Добавьте проверочные вопросы</p>
+                </div>
+                <button 
+                  onClick={addQuestion}
+                  className="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-4 py-2 rounded-xl font-bold hover:bg-emerald-100 transition-all text-xs"
+                >
+                  <Plus className="w-4 h-4" />
+                  Добавить вопрос
+                </button>
+             </div>
+
+             <div className="space-y-6">
+                {quizQuestions.map((q, qIdx) => (
+                  <motion.div 
+                    key={qIdx}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-stone-50 border border-stone-200 rounded-[2rem] p-6 relative group/q"
+                  >
+                    <button 
+                      onClick={() => removeQuestion(qIdx)}
+                      className="absolute top-4 right-4 p-2 text-stone-300 hover:text-rose-600 transition-colors opacity-0 group-hover/q:opacity-100"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+
+                    <div className="space-y-4">
+                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                             <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Вопрос (RU)</label>
+                             <input 
+                               value={q.text_ru}
+                               onChange={(e) => updateQuestion(qIdx, 'text_ru', e.target.value)}
+                               className="w-full bg-white border border-stone-200 rounded-xl py-3 px-4 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                             />
+                          </div>
+                          <div className="space-y-1">
+                             <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Вопрос (TYV)</label>
+                             <input 
+                               value={q.text_tyv}
+                               onChange={(e) => updateQuestion(qIdx, 'text_tyv', e.target.value)}
+                               className="w-full bg-white border border-stone-200 rounded-xl py-3 px-4 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                             />
+                          </div>
+                       </div>
+
+                       <div className="space-y-3 pt-2">
+                          <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest block">Варианты ответов</label>
+                          <div className="grid grid-cols-1 gap-2">
+                             {q.options.map((opt, oIdx) => (
+                               <div key={oIdx} className="flex gap-2">
+                                  <button 
+                                    onClick={() => updateOption(qIdx, oIdx, 'is_correct', true)}
+                                    className={`shrink-0 w-10 flex items-center justify-center rounded-xl transition-all ${opt.is_correct ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' : 'bg-white border border-stone-200 text-stone-200'}`}
+                                  >
+                                    <CheckCircle2 className="w-5 h-5" />
+                                  </button>
+                                  <input 
+                                    placeholder="Вариант (RU)"
+                                    value={opt.text_ru}
+                                    onChange={(e) => updateOption(qIdx, oIdx, 'text_ru', e.target.value)}
+                                    className="flex-grow bg-white border border-stone-200 rounded-xl py-2 px-4 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                  />
+                                  <input 
+                                    placeholder="Вариант (TYV)"
+                                    value={opt.text_tyv}
+                                    onChange={(e) => updateOption(qIdx, oIdx, 'text_tyv', e.target.value)}
+                                    className="flex-grow bg-white border border-stone-200 rounded-xl py-2 px-4 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                  />
+                               </div>
+                             ))}
+                          </div>
+                       </div>
+                    </div>
+                  </motion.div>
+                ))}
+
+                {quizQuestions.length === 0 && (
+                  <div className="text-center py-12 border-2 border-dashed border-stone-200 rounded-[2rem]">
+                     <HelpCircle className="w-12 h-12 text-stone-200 mx-auto mb-4" />
+                     <p className="text-stone-400 font-bold">Тесты не добавлены. Содержание будет только текстовым.</p>
+                  </div>
+                )}
+             </div>
+          </div>
+        )}
+
         {/* Preview Area (Side-by-side or Tab) */}
-        <div className={`flex-grow bg-white p-6 sm:p-8 overflow-y-auto ${activeTab === 'edit' ? 'hidden md:block' : 'block'} border-l border-stone-100`}>
+        <div className={`flex-grow bg-white p-6 sm:p-8 overflow-y-auto ${activeTab === 'edit' ? 'hidden md:block' : (activeTab === 'preview' ? 'block' : 'hidden')} border-l border-stone-100`}>
           <div className="max-w-prose mx-auto">
             <div className="flex items-center gap-2 mb-8 text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em]">
                <Eye className="w-4 h-4" />

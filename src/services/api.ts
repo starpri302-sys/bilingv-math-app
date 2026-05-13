@@ -279,6 +279,34 @@ export const api = {
     const res = await fetch(`/api/lectures/${lectureId}/quiz`);
     return handleResponse(res);
   },
+  async saveLectureQuiz(lectureId: string, quizData: any) {
+    const res = await fetch(`/api/lectures/${lectureId}/quiz`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify(quizData)
+    });
+    return handleResponse(res);
+  },
+  async completeLecture(lectureId: string, data: { score?: number; max_score?: number }) {
+    const res = await fetch(`/api/lectures/${lectureId}/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+  async getUserProgress() {
+    const res = await fetch('/api/users/me/progress', {
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
+  async getCourseStats(courseId: string) {
+    const res = await fetch(`/api/courses/${courseId}/stats`, {
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
   async createCourse(data: any) {
     const res = await fetch('/api/courses', {
       method: 'POST',
@@ -287,11 +315,41 @@ export const api = {
     });
     return handleResponse(res);
   },
+  async updateCourse(id: string, data: any) {
+    const res = await fetch(`/api/courses/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+  async deleteCourse(id: string) {
+    const res = await fetch(`/api/courses/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
   async createLecture(data: any) {
     const res = await fetch('/api/lectures', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
       body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+  async updateLecture(id: string, data: any) {
+    const res = await fetch(`/api/lectures/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+  async deleteLecture(id: string) {
+    const res = await fetch(`/api/lectures/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeader()
     });
     return handleResponse(res);
   }
