@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { GraduationCap, BookOpen, Clock, ChevronRight, Lock, Sparkles, Search, Plus, X, ChevronLeft, FileText, CheckCircle2, Edit3, Trash2, Trophy, BarChart3 } from 'lucide-react';
+import { GraduationCap, BookOpen, Clock, ChevronRight, Lock, Sparkles, Search, Plus, X, ChevronLeft, FileText, CheckCircle2, Edit3, Trash2, Trophy, BarChart3, HelpCircle } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../store/authContext';
 import SEO from '../components/SEO';
 import LectureEditor from '../components/LectureEditor';
+import VisualTestEditor from '../components/VisualTestEditor';
 
 interface Course {
   id: string;
@@ -27,6 +28,7 @@ interface Lecture {
   content_tyv: string;
   order_index: number;
   is_free: number;
+  item_type: 'theory' | 'test';
   quiz?: any;
 }
 
@@ -52,11 +54,12 @@ export default function Courses() {
   // Detail States
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [lectures, setLectures] = useState<Lecture[]>([]);
-  const [userProgress, setUserProgress] = useState<string[]>([]);
+  const [userProgress, setUserProgress] = useState<any[]>([]);
   const [lecturesLoading, setLecturesLoading] = useState(false);
   const [editingLecture, setEditingLecture] = useState<Lecture | null>(null);
+  const [createType, setCreateType] = useState<'theory' | 'test' | null>(null);
 
-  const { isPro, user, profile } = useAuth();
+  const { isPro, isTeacher, user, profile } = useAuth();
 
   const fetchData = async () => {
     setLoading(true);
@@ -69,12 +72,22 @@ export default function Courses() {
       setCourses(coursesData);
       setSubjects(subjectsData);
       if (Array.isArray(progressData)) {
-        setUserProgress(progressData.map((p: any) => p.lecture_id));
+        setUserProgress(progressData);
       }
     } catch (err) {
       console.error('Failed to fetch data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchStats = async (courseId: string) => {
+    try {
+      const data = await api.getCourseStats(courseId);
+      setStats(data);
+      setShowStats(true);
+    } catch (err) {
+      console.error('Failed to fetch stats:', err);
     }
   };
 
@@ -175,22 +188,33 @@ export default function Courses() {
     setIsSubmitting(true);
     try {
       let lectureId = editingLecture?.id;
+      const payload = {
+        course_id: id,
+        item_type: createType || editingLecture?.item_type || 'theory',
+        ...data
+      };
+
       if (editingLecture) {
-        await api.updateLecture(editingLecture.id, data);
+        await api.updateLecture(editingLecture.id, payload);
       } else {
-        const res = await api.createLecture({
-          course_id: id,
-          ...data
-        });
+        const res = await api.createLecture(payload);
         lectureId = res.id;
       }
 
       if (lectureId && data.quiz) {
         await api.saveLectureQuiz(lectureId, data.quiz);
+      } else if (lectureId && data.blocks) {
+        // For visual tests, we store blocks as JSON in content
+        // Or we can have a separate structure. For now, let's store JSON in content_ru
+        await api.updateLecture(lectureId, {
+          ...payload,
+          content_ru: JSON.stringify(data.blocks)
+        });
       }
 
       setShowLectureEditor(false);
       setEditingLecture(null);
+      setCreateType(null);
       fetchCourseLectures(id);
     } catch (err) {
       console.error('Failed to save lecture:', err);
@@ -335,48 +359,95 @@ export default function Courses() {
             )}
 
             {isPro && !showLectureEditor && (
-              <div className="mt-10 pt-10 border-t border-stone-100 flex justify-between items-center">
+              <div className="mt-10 pt-10 border-t border-stone-100 flex flex-wrap justify-between items-center gap-6">
                  <div>
-                   <h3 className="font-bold text-stone-900 mb-1">Управление материалом</h3>
-                   <p className="text-xs text-stone-400">Добавляйте новые лекции, используя Discourse-редактор</p>
+                   <h3 className="font-bold text-stone-900 mb-1 font-serif text-xl">Управление материалом</h3>
+                   <p className="text-xs text-stone-400 font-bold uppercase tracking-widest">Создавайте лекции и интерактивные тесты</p>
                  </div>
-                 <button 
-                   onClick={() => setShowLectureEditor(true)}
-                   className="flex items-center gap-2 bg-stone-900 text-white px-6 py-3 rounded-2xl font-bold hover:bg-emerald-600 transition-all active:scale-95 shadow-lg"
-                 >
-                   <Plus className="w-5 h-5" />
-                   Добавить лекцию
-                 </button>
+                 <div className="flex items-center gap-3">
+                   <button 
+                     onClick={() => { setCreateType('theory'); setShowLectureEditor(true); }}
+                     className="flex items-center gap-2 bg-stone-100 text-stone-600 px-6 py-3 rounded-2xl font-bold hover:bg-stone-200 transition-all active:scale-95"
+                   >
+                     <FileText className="w-5 h-5 text-emerald-500" />
+                     Лекция
+                   </button>
+                   <button 
+                     onClick={() => { setCreateType('test'); setShowLectureEditor(true); }}
+                     className="flex items-center gap-2 bg-stone-900 text-white px-6 py-3 rounded-2xl font-bold hover:bg-emerald-600 transition-all active:scale-95 shadow-lg shadow-stone-200"
+                   >
+                     <Plus className="w-5 h-5" />
+                     Тест
+                   </button>
+                 </div>
               </div>
             )}
           </div>
         </div>
 
-        <div className="max-w-4xl mx-auto px-4 mt-12">
+        <div className="max-w-7xl mx-auto px-4 mt-12">
           {showLectureEditor ? (
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
+              className="space-y-8"
             >
-              <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center justify-between">
                 <button 
-                  onClick={() => setShowLectureEditor(false)}
+                  onClick={() => { setShowLectureEditor(false); setEditingLecture(null); setCreateType(null); }}
                   className="flex items-center gap-2 text-stone-400 hover:text-rose-600 font-bold text-xs uppercase tracking-widest transition-colors"
                 >
                   <X className="w-4 h-4" />
-                  Отменить создание
+                  Отменить {editingLecture ? 'редактирование' : 'создание'}
                 </button>
               </div>
-              <LectureEditor 
-                onSave={handleCreateLecture} 
-                isSubmitting={isSubmitting} 
-                initialTitleRu={editingLecture?.title_ru}
-                initialTitleTyv={editingLecture?.title_tyv}
-                initialContentRu={editingLecture?.content_ru}
-                initialContentTyv={editingLecture?.content_tyv}
-                initialIsFree={editingLecture?.is_free === 1}
-                initialQuiz={editingLecture?.quiz}
-              />
+
+              {(createType === 'test' || editingLecture?.item_type === 'test') ? (
+                <div className="space-y-8">
+                   <div className="bg-white p-8 rounded-[2.5rem] border border-stone-200">
+                      <h2 className="text-2xl font-serif font-black text-stone-900 mb-8">Настройки теста</h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Название теста (RU)</label>
+                          <input 
+                            value={editingLecture?.title_ru || ''}
+                            onChange={(e) => setEditingLecture(prev => ({ ...(prev as any), title_ru: e.target.value }))}
+                            className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-emerald-500/10 font-bold"
+                            placeholder="Напр: Итоговый тест по тригонометрии"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Название теста (TYV)</label>
+                          <input 
+                            value={editingLecture?.title_tyv || ''}
+                            onChange={(e) => setEditingLecture(prev => ({ ...(prev as any), title_tyv: e.target.value }))}
+                            className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-emerald-500/10 font-bold"
+                          />
+                        </div>
+                      </div>
+                   </div>
+                   <VisualTestEditor 
+                     initialBlocks={editingLecture?.content_ru ? JSON.parse(editingLecture.content_ru) : []}
+                     onSave={(blocks) => handleCreateLecture({ 
+                       title_ru: editingLecture?.title_ru || 'Без названия', 
+                       title_tyv: editingLecture?.title_tyv || '',
+                       blocks,
+                       is_free: editingLecture?.is_free === 1
+                     })} 
+                   />
+                </div>
+              ) : (
+                <LectureEditor 
+                  onSave={handleCreateLecture} 
+                  isSubmitting={isSubmitting} 
+                  initialTitleRu={editingLecture?.title_ru}
+                  initialTitleTyv={editingLecture?.title_tyv}
+                  initialContentRu={editingLecture?.content_ru}
+                  initialContentTyv={editingLecture?.content_tyv}
+                  initialIsFree={editingLecture?.is_free === 1}
+                  initialQuiz={editingLecture?.quiz}
+                />
+              )}
             </motion.div>
           ) : (
             <div className="space-y-6">
@@ -407,18 +478,25 @@ export default function Courses() {
                             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -mr-16 -mt-16 opacity-0 group-hover:opacity-100 transition-all duration-500 scale-0 group-hover:scale-100" />
                             
                             <div className="flex items-center gap-6 relative">
-                              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-mono font-black border transition-colors ${userProgress.includes(lecture.id) ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-stone-50 text-stone-300 border-stone-100 group-hover:bg-emerald-50 group-hover:text-emerald-500'}`}>
-                                {userProgress.includes(lecture.id) ? <CheckCircle2 className="w-6 h-6" /> : idx + 1}
+                          <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-mono font-black border transition-colors bg-stone-50 text-stone-300 border-stone-100 group-hover:bg-emerald-50 group-hover:text-emerald-500">
+                             {lecture.item_type === 'test' ? (userProgress.some((p: any) => p.lecture_id === lecture.id) ? <Trophy className="w-6 h-6 text-emerald-600" /> : <HelpCircle className="w-6 h-6" />) : (userProgress.some((p: any) => p.lecture_id === lecture.id) ? <CheckCircle2 className="w-6 h-6 text-emerald-600" /> : idx + 1)}
+                          </div>
+                          <div className="flex-grow">
+                            <h3 className="text-lg sm:text-xl font-bold text-stone-900 mb-1 group-hover:text-emerald-600 transition-colors">
+                              <div className="flex items-center gap-3">
+                                {lecture.title_ru}
+                                {userProgress.find((p: any) => p.lecture_id === lecture.id)?.score !== undefined && (
+                                  <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 uppercase tracking-widest leading-none">
+                                    {userProgress.find((p: any) => p.lecture_id === lecture.id).score} / {userProgress.find((p: any) => p.lecture_id === lecture.id).max_score}
+                                  </span>
+                                )}
                               </div>
-                              <div className="flex-grow">
-                                <h3 className="text-lg sm:text-xl font-bold text-stone-900 mb-1 group-hover:text-emerald-600 transition-colors">
-                                  {lecture.title_ru}
-                                </h3>
-                                <div className="flex items-center gap-3">
-                                  <div className="flex items-center gap-1.5 text-[10px] font-black text-stone-400 uppercase tracking-widest">
-                                    <FileText className="w-3.5 h-3.5" />
-                                    Лекция
-                                  </div>
+                            </h3>
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-1.5 text-[10px] font-black text-stone-400 uppercase tracking-widest">
+                                {lecture.item_type === 'test' ? <HelpCircle className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+                                {lecture.item_type === 'test' ? 'Итоговый Тест' : 'Лекция'}
+                              </div>
                                   {lecture.is_free === 1 ? (
                                     <span className="text-[10px] font-black text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-md uppercase tracking-widest">Бесплатно</span>
                                   ) : (

@@ -27,7 +27,20 @@ interface Lecture {
   title_tyv: string;
   content_ru: string;
   content_tyv: string;
-  is_free: number;
+  item_type: 'theory' | 'test';
+}
+
+interface VisualBlock {
+  id: string;
+  type: 'text' | 'image' | 'question';
+  content: string;
+  imageUrl?: string;
+  questionData?: {
+    ru: string;
+    tyv: string;
+    options: { text_ru: string; text_tyv: string; is_correct: boolean; id: string }[];
+  };
+  layout?: 'full' | 'half' | 'third';
 }
 
 interface Quiz {
@@ -53,6 +66,7 @@ export default function LectureDetail() {
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
   const [lang, setLang] = useState<'ru' | 'tyv'>('ru');
+  const [visualBlocks, setVisualBlocks] = useState<VisualBlock[]>([]);
   const [isProNeeded, setIsProNeeded] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -94,6 +108,11 @@ export default function LectureDetail() {
       try {
         const data = await api.getLecture(id!);
         setLecture(data);
+        if (data.item_type === 'test' && data.content_ru) {
+          try {
+            setVisualBlocks(JSON.parse(data.content_ru));
+          } catch(e) { console.error('Failed to parse test blocks'); }
+        }
         fetchComments();
         fetchQuiz();
         fetchProgress();
@@ -212,21 +231,62 @@ export default function LectureDetail() {
               </div>
             </header>
 
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={lang}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="prose prose-stone prose-lg max-w-none prose-p:leading-relaxed prose-headings:font-serif prose-headings:font-black"
-              >
-                <MathText 
-                  text={lang === 'ru' ? lecture.content_ru : lecture.content_tyv} 
-                  isHtml 
-                  className="text-stone-700 space-y-6"
-                />
-              </motion.div>
-            </AnimatePresence>
+            {lecture.item_type === 'test' ? (
+              <div className="space-y-8">
+                 {visualBlocks.map((block) => (
+                   <div key={block.id} className={`${block.layout === 'half' ? 'lg:w-1/2' : block.layout === 'third' ? 'lg:w-1/3' : 'w-full'}`}>
+                      {block.type === 'text' && (
+                        <div className="bg-stone-50 p-8 rounded-[2rem] border border-stone-100">
+                           <MathText text={block.content} isHtml />
+                        </div>
+                      )}
+                      {block.type === 'image' && block.imageUrl && (
+                        <img src={block.imageUrl} alt="" className="w-full rounded-[2.5rem] shadow-lg mb-8" />
+                      )}
+                      {block.type === 'question' && block.questionData && (
+                        <div className="mt-8">
+                           <LectureQuiz 
+                             quiz={{
+                               id: block.id,
+                               title_ru: 'Вопрос',
+                               title_tyv: 'Айтырыг',
+                               questions: [{
+                                 id: block.id,
+                                 question_ru: block.questionData.ru,
+                                 question_tyv: block.questionData.tyv,
+                                 options: block.questionData.options.map((o, i) => ({
+                                   id: o.id || String(i),
+                                   text_ru: o.text_ru,
+                                   text_tyv: o.text_tyv,
+                                   is_correct: o.is_correct ? 1 : 0
+                                 }))
+                               }]
+                             }}
+                             lang={lang}
+                             onComplete={(score, max) => console.log('Partial score:', score, max)}
+                           />
+                        </div>
+                      )}
+                   </div>
+                 ))}
+              </div>
+            ) : (
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={lang}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="prose prose-stone prose-lg max-w-none prose-p:leading-relaxed prose-headings:font-serif prose-headings:font-black"
+                >
+                  <MathText 
+                    text={lang === 'ru' ? lecture.content_ru : lecture.content_tyv} 
+                    isHtml 
+                    className="text-stone-700 space-y-6"
+                  />
+                </motion.div>
+              </AnimatePresence>
+            )}
           </div>
 
           <div className="bg-stone-50/50 border-t border-stone-100 p-8 sm:p-12">

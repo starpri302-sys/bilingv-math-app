@@ -649,7 +649,7 @@ async function startServer() {
   });
 
   app.post("/api/lectures", authenticateToken, requirePro, async (req, res) => {
-    const { course_id, title_ru, title_tyv, content_ru, content_tyv, is_free } = req.body;
+    const { course_id, title_ru, title_tyv, content_ru, content_tyv, is_free, item_type } = req.body;
     const id = Math.random().toString(36).substr(2, 9);
     try {
       // Get max order_index
@@ -657,21 +657,22 @@ async function startServer() {
       const nextIdx = (parseInt(orderRes.rows[0].max_idx) || 0) + 1;
 
       await pool.query(
-        "INSERT INTO lectures (id, course_id, title_ru, title_tyv, content_ru, content_tyv, order_index, is_free) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-        [id, course_id, title_ru, title_tyv, content_ru, content_tyv, nextIdx, is_free ? 1 : 0]
+        "INSERT INTO lectures (id, course_id, title_ru, title_tyv, content_ru, content_tyv, order_index, is_free, item_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+        [id, course_id, title_ru, title_tyv, content_ru, content_tyv, nextIdx, is_free ? 1 : 0, item_type || 'theory']
       );
       res.json({ id, success: true });
     } catch (error) {
+      console.error(error);
       res.status(500).json({ error: "Failed to create lecture" });
     }
   });
 
   app.put("/api/lectures/:id", authenticateToken, requirePro, async (req, res) => {
-    const { title_ru, title_tyv, content_ru, content_tyv, is_free } = req.body;
+    const { title_ru, title_tyv, content_ru, content_tyv, is_free, item_type } = req.body;
     try {
       await pool.query(
-        "UPDATE lectures SET title_ru = $1, title_tyv = $2, content_ru = $3, content_tyv = $4, is_free = $5 WHERE id = $6",
-        [title_ru, title_tyv, content_ru, content_tyv, is_free ? 1 : 0, req.params.id]
+        "UPDATE lectures SET title_ru = $1, title_tyv = $2, content_ru = $3, content_tyv = $4, is_free = $5, item_type = $6 WHERE id = $7",
+        [title_ru, title_tyv, content_ru, content_tyv, is_free ? 1 : 0, item_type, req.params.id]
       );
       res.json({ success: true });
     } catch (error) {

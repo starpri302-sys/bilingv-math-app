@@ -11,6 +11,7 @@ interface AuthContextType {
   isSuperAdmin: boolean;
   isAdmin: boolean;
   isPro: boolean;
+  isTeacher: boolean;
   login: (data: any) => Promise<any>;
   register: (data: any) => Promise<any>;
   logout: () => void;
@@ -27,6 +28,7 @@ const AuthContext = createContext<AuthContextType>({
   isSuperAdmin: false,
   isAdmin: false,
   isPro: false,
+  isTeacher: false,
   login: async () => {},
   register: async () => {},
   logout: () => {},
@@ -104,7 +106,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     isChiefEditor: profile?.role === 'chief_editor',
     isSuperAdmin: profile?.role === 'super_admin',
     isAdmin: profile?.role === 'chief_editor' || profile?.role === 'super_admin',
-    isPro: profile?.subscription_tier === 'pro' || profile?.role === 'chief_editor' || profile?.role === 'super_admin',
+    isPro: profile?.subscription_tier === 'pro' || profile?.role === 'chief_editor' || profile?.role === 'super_admin' || profile?.role === 'teacher',
+    isTeacher: profile?.role === 'teacher' || profile?.role === 'chief_editor' || profile?.role === 'super_admin',
     login,
     register,
     logout,

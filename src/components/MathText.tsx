@@ -18,13 +18,15 @@ export default function MathText({ text, className, as: Component = 'span', isHt
   };
 
   if (isHtml) {
-    let processedHtml = text.replace(boxTokens, () => {
-      return `<span class="inline-flex items-center justify-center w-[1.1em] h-[1.1em] border-[1.5px] border-stone-400 rounded-[4px] bg-white align-middle mx-0.5 -mt-0.5 shadow-sm" aria-hidden="true"></span>`;
+    // Improved character-level processing for HTML to avoid tagging digits in attributes
+    const processedHtml = text.replace(/<[^>]+>|[^<]+/g, (match) => {
+      if (match.startsWith('<')) return match; // Skip HTML tags
+      
+      // Process text nodes: replace digits and math symbols
+      let nodeText = match.replace(/\b(\d+)\b/g, styleDigit);
+      nodeText = nodeText.replace(/(\+|-|=|>|<|\*|\/|\^|√)/g, '<span class="font-mono font-black text-emerald-600 scale-110 inline-block mx-0.5">$1</span>');
+      return nodeText;
     });
-
-    // Replace digits and math symbols
-    processedHtml = processedHtml.replace(/(?<!<[^>]*)\b(\d+)\b(?![^<]*>)/g, styleDigit);
-    processedHtml = processedHtml.replace(/(?<!<[^>]*)(\+|-|=|>|<|\*|\/|\^|√)(?![^<]*>)/g, '<span class="font-mono font-black text-emerald-600 scale-110 inline-block mx-0.5">$1</span>');
     
     return (
       <Component 

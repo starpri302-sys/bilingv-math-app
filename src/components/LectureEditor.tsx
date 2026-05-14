@@ -51,6 +51,44 @@ export default function LectureEditor({
   const [activeTab, setActiveTab] = useState<'edit' | 'preview' | 'quiz'>('edit');
   const [lang, setLang] = useState<'ru' | 'tyv'>('ru');
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(initialQuiz?.questions || []);
+  const [splitWidth, setSplitWidth] = useState(50); // percentage for editor area
+  const [isResizing, setIsResizing] = useState(false);
+
+  const startResizing = (e: React.MouseEvent) => {
+    setIsResizing(true);
+    e.preventDefault();
+  };
+
+  const stopResizing = () => {
+    setIsResizing(false);
+  };
+
+  const resize = (e: MouseEvent) => {
+    if (!isResizing) return;
+    const editorContainer = document.getElementById('lecture-editor-container');
+    if (!editorContainer) return;
+    
+    const containerWidth = editorContainer.offsetWidth;
+    const newWidth = (e.clientX - editorContainer.getBoundingClientRect().left) / containerWidth * 100;
+    
+    if (newWidth > 20 && newWidth < 80) {
+      setSplitWidth(newWidth);
+    }
+  };
+
+  React.useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', resize);
+      window.addEventListener('mouseup', stopResizing);
+    } else {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+    }
+    return () => {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+    };
+  }, [isResizing]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,14 +141,16 @@ export default function LectureEditor({
   };
 
   return (
-    <div className="bg-white rounded-[2.5rem] border border-stone-200 shadow-xl overflow-hidden min-h-[600px] flex flex-col">
+    <div id="lecture-editor-container" className="bg-white rounded-[2.5rem] border border-stone-200 shadow-xl overflow-hidden min-h-[700px] flex flex-col">
       {/* Editor Header */}
       <div className="bg-stone-50 border-b border-stone-200 p-4 sm:px-8 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600">
             <Edit3 className="w-5 h-5" />
           </div>
-          <h2 className="font-serif font-black text-stone-900 tracking-tight">Создание лекции</h2>
+          <h2 className="font-serif font-black text-stone-900 tracking-tight">
+            {activeTab === 'quiz' ? 'Настройка теста' : 'Редактор лекции'}
+          </h2>
         </div>
 
         <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-stone-200">
@@ -123,7 +163,7 @@ export default function LectureEditor({
           </button>
           <button
             onClick={() => setActiveTab('preview')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'preview' ? 'bg-emerald-600 text-white shadow-md' : 'text-stone-500 hover:text-stone-700'}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'preview' ? 'bg-emerald-600 text-white shadow-md' : 'text-stone-500 hover:text-stone-700'} md:hidden`}
           >
             <Eye className="w-4 h-4" />
             Предпросмотр
@@ -159,9 +199,9 @@ export default function LectureEditor({
       </div>
 
       {/* Editor Body */}
-      <div className="flex-grow flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-stone-200">
+      <div className="flex-grow flex flex-col md:flex-row relative">
         {/* Languages Switcher */}
-        <div className="bg-stone-50/50 p-4 border-b md:border-b-0 md:border-r border-stone-200 flex md:flex-col gap-2 min-w-[60px]">
+        <div className="bg-stone-50/50 p-4 border-b md:border-b-0 md:border-r border-stone-200 flex md:flex-col gap-2 min-w-[60px] z-10">
           <button 
             onClick={() => setLang('ru')}
             className={`w-full aspect-square md:w-10 md:h-10 rounded-xl flex items-center justify-center font-bold text-sm transition-all ${lang === 'ru' ? 'bg-white text-emerald-600 shadow-sm border border-emerald-100' : 'text-stone-400 hover:text-stone-600'}`}
@@ -176,153 +216,174 @@ export default function LectureEditor({
           </button>
         </div>
 
-        {/* Input Area */}
-        <div className={`flex-grow flex flex-col p-6 sm:p-8 space-y-6 ${activeTab !== 'edit' ? 'hidden md:flex' : 'flex'}`}>
-           <div className="space-y-2">
-             <label className="text-[10px] font-black text-stone-400 uppercase tracking-[0.2em]">Заголовок ({lang === 'ru' ? 'Рус' : 'Тув'})</label>
-             <input 
-               type="text"
-               value={lang === 'ru' ? titleRu : titleTyv}
-               onChange={(e) => lang === 'ru' ? setTitleRu(e.target.value) : setTitleTyv(e.target.value)}
-               placeholder={lang === 'ru' ? "Например: Основы логарифмов" : "Чижээ: Логарифмнар үндезини"}
-               className="w-full bg-stone-50 border border-stone-100 rounded-2xl py-4 px-6 text-xl font-serif font-bold text-stone-900 outline-none focus:ring-4 focus:ring-stone-500/5 transition-all"
-             />
-           </div>
-
-           <div className="flex-grow flex flex-col space-y-2">
-             <label className="text-[10px] font-black text-stone-400 uppercase tracking-[0.2em] flex items-center justify-between">
-               Содержание лекции
-               <span className="flex items-center gap-1 font-bold text-emerald-600 normal-case tracking-normal">
-                 <Info className="w-3 h-3" />
-                 Поддерживает LaTeX: $x^2$
-               </span>
-             </label>
-             <textarea 
-               value={lang === 'ru' ? contentRu : contentTyv}
-               onChange={(e) => lang === 'ru' ? setContentRu(e.target.value) : setContentTyv(e.target.value)}
-               placeholder="Пишите лекционный материал здесь..."
-               className="flex-grow w-full bg-stone-50 border border-stone-100 rounded-[2rem] p-8 text-stone-700 outline-none focus:ring-4 focus:ring-stone-500/5 transition-all min-h-[300px] resize-none leading-relaxed"
-             />
-           </div>
-        </div>
-
-        {/* Quiz Area */}
-        {activeTab === 'quiz' && (
-          <div className="flex-grow p-6 sm:p-8 space-y-8 overflow-y-auto max-h-[700px]">
-             <div className="flex items-center justify-between">
-                <div>
-                   <h3 className="text-xl font-serif font-black text-stone-900">Редактор тестов</h3>
-                   <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mt-1">Добавьте проверочные вопросы</p>
-                </div>
-                <button 
-                  onClick={addQuestion}
-                  className="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-4 py-2 rounded-xl font-bold hover:bg-emerald-100 transition-all text-xs"
-                >
-                  <Plus className="w-4 h-4" />
-                  Добавить вопрос
-                </button>
-             </div>
-
-             <div className="space-y-6">
-                {quizQuestions.map((q, qIdx) => (
-                  <motion.div 
-                    key={qIdx}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-stone-50 border border-stone-200 rounded-[2rem] p-6 relative group/q"
-                  >
-                    <button 
-                      onClick={() => removeQuestion(qIdx)}
-                      className="absolute top-4 right-4 p-2 text-stone-300 hover:text-rose-600 transition-colors opacity-0 group-hover/q:opacity-100"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-
-                    <div className="space-y-4">
-                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="space-y-1">
-                             <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Вопрос (RU)</label>
-                             <input 
-                               value={q.text_ru}
-                               onChange={(e) => updateQuestion(qIdx, 'text_ru', e.target.value)}
-                               className="w-full bg-white border border-stone-200 rounded-xl py-3 px-4 outline-none focus:ring-2 focus:ring-emerald-500/20"
-                             />
-                          </div>
-                          <div className="space-y-1">
-                             <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Вопрос (TYV)</label>
-                             <input 
-                               value={q.text_tyv}
-                               onChange={(e) => updateQuestion(qIdx, 'text_tyv', e.target.value)}
-                               className="w-full bg-white border border-stone-200 rounded-xl py-3 px-4 outline-none focus:ring-2 focus:ring-emerald-500/20"
-                             />
-                          </div>
-                       </div>
-
-                       <div className="space-y-3 pt-2">
-                          <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest block">Варианты ответов</label>
-                          <div className="grid grid-cols-1 gap-2">
-                             {q.options.map((opt, oIdx) => (
-                               <div key={oIdx} className="flex gap-2">
-                                  <button 
-                                    onClick={() => updateOption(qIdx, oIdx, 'is_correct', true)}
-                                    className={`shrink-0 w-10 flex items-center justify-center rounded-xl transition-all ${opt.is_correct ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' : 'bg-white border border-stone-200 text-stone-200'}`}
-                                  >
-                                    <CheckCircle2 className="w-5 h-5" />
-                                  </button>
-                                  <input 
-                                    placeholder="Вариант (RU)"
-                                    value={opt.text_ru}
-                                    onChange={(e) => updateOption(qIdx, oIdx, 'text_ru', e.target.value)}
-                                    className="flex-grow bg-white border border-stone-200 rounded-xl py-2 px-4 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20"
-                                  />
-                                  <input 
-                                    placeholder="Вариант (TYV)"
-                                    value={opt.text_tyv}
-                                    onChange={(e) => updateOption(qIdx, oIdx, 'text_tyv', e.target.value)}
-                                    className="flex-grow bg-white border border-stone-200 rounded-xl py-2 px-4 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20"
-                                  />
-                               </div>
-                             ))}
-                          </div>
-                       </div>
+        {/* Dynamic Split Layout */}
+        <div className="flex-grow flex flex-col md:flex-row relative overflow-hidden">
+          
+          {/* Main Editing Area (Text or Quiz) */}
+          <div 
+            style={{ width: activeTab === 'edit' && window.innerWidth >= 768 ? `${splitWidth}%` : '100%' }}
+            className={`flex flex-col min-h-0 bg-stone-50 ${activeTab === 'preview' ? 'hidden md:flex' : 'flex'} ${activeTab === 'quiz' ? 'md:w-full' : ''}`}
+          >
+            {activeTab === 'quiz' ? (
+              <div className="flex-grow p-6 sm:p-8 space-y-8 overflow-y-auto">
+                 <div className="flex items-center justify-between">
+                    <div>
+                       <h3 className="text-xl font-serif font-black text-stone-900">Редактор тестов</h3>
+                       <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mt-1">Добавьте проверочные вопросы</p>
                     </div>
-                  </motion.div>
-                ))}
+                    <button 
+                      onClick={addQuestion}
+                      className="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-4 py-2 rounded-xl font-bold hover:bg-emerald-100 transition-all text-xs"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Добавить вопрос
+                    </button>
+                 </div>
 
-                {quizQuestions.length === 0 && (
-                  <div className="text-center py-12 border-2 border-dashed border-stone-200 rounded-[2rem]">
-                     <HelpCircle className="w-12 h-12 text-stone-200 mx-auto mb-4" />
-                     <p className="text-stone-400 font-bold">Тесты не добавлены. Содержание будет только текстовым.</p>
+                 <div className="space-y-6">
+                    {quizQuestions.map((q, qIdx) => (
+                      <motion.div 
+                        key={qIdx}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-white border border-stone-200 rounded-[2rem] p-6 relative group/q shadow-sm"
+                      >
+                        <button 
+                          onClick={() => removeQuestion(qIdx)}
+                          className="absolute top-4 right-4 p-2 text-stone-300 hover:text-rose-600 transition-colors opacity-0 group-hover/q:opacity-100"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+
+                        <div className="space-y-4">
+                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                 <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Вопрос (RU)</label>
+                                 <input 
+                                   value={q.text_ru}
+                                   onChange={(e) => updateQuestion(qIdx, 'text_ru', e.target.value)}
+                                   className="w-full bg-stone-50 border border-stone-200 rounded-xl py-3 px-4 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                 />
+                              </div>
+                              <div className="space-y-1">
+                                 <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Вопрос (TYV)</label>
+                                 <input 
+                                   value={q.text_tyv}
+                                   onChange={(e) => updateQuestion(qIdx, 'text_tyv', e.target.value)}
+                                   className="w-full bg-stone-50 border border-stone-200 rounded-xl py-3 px-4 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                 />
+                              </div>
+                           </div>
+
+                           <div className="space-y-3 pt-2">
+                              <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest block">Варианты ответов</label>
+                              <div className="grid grid-cols-1 gap-2">
+                                 {q.options.map((opt, oIdx) => (
+                                   <div key={oIdx} className="flex gap-2">
+                                      <button 
+                                        onClick={() => updateOption(qIdx, oIdx, 'is_correct', true)}
+                                        className={`shrink-0 w-10 flex items-center justify-center rounded-xl transition-all ${opt.is_correct ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' : 'bg-stone-50 border border-stone-200 text-stone-200'}`}
+                                      >
+                                        <CheckCircle2 className="w-5 h-5" />
+                                      </button>
+                                      <input 
+                                        placeholder="Вариант (RU)"
+                                        value={opt.text_ru}
+                                        onChange={(e) => updateOption(qIdx, oIdx, 'text_ru', e.target.value)}
+                                        className="flex-grow bg-white border border-stone-200 rounded-xl py-2 px-4 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                      />
+                                      <input 
+                                        placeholder="Вариант (TYV)"
+                                        value={opt.text_tyv}
+                                        onChange={(e) => updateOption(qIdx, oIdx, 'text_tyv', e.target.value)}
+                                        className="flex-grow bg-white border border-stone-200 rounded-xl py-2 px-4 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                      />
+                                   </div>
+                                 ))}
+                              </div>
+                           </div>
+                        </div>
+                      </motion.div>
+                    ))}
+
+                    {quizQuestions.length === 0 && (
+                      <div className="text-center py-20 border-2 border-dashed border-stone-200 rounded-[3rem] bg-white">
+                         <HelpCircle className="w-12 h-12 text-stone-200 mx-auto mb-4" />
+                         <p className="text-stone-400 font-bold">Тесты не добавлены.</p>
+                      </div>
+                    )}
+                 </div>
+              </div>
+            ) : (
+              <div className="p-6 sm:p-8 space-y-6 flex-grow overflow-y-auto">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-stone-400 uppercase tracking-[0.2em]">Заголовок лекции</label>
+                  <input 
+                    type="text"
+                    value={lang === 'ru' ? titleRu : titleTyv}
+                    onChange={(e) => lang === 'ru' ? setTitleRu(e.target.value) : setTitleTyv(e.target.value)}
+                    placeholder={lang === 'ru' ? "Название раздела..." : "Бөлүктүң ады..."}
+                    className="w-full bg-white border border-stone-100 rounded-2xl py-4 px-6 text-xl font-serif font-black text-stone-900 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all shadow-sm"
+                  />
+                </div>
+
+                <div className="flex-grow flex flex-col space-y-2">
+                  <label className="text-[10px] font-black text-stone-400 uppercase tracking-[0.2em] flex items-center justify-between">
+                    Содержание
+                    <span className="flex items-center gap-1 font-bold text-emerald-600 normal-case tracking-normal">
+                      <HelpCircle className="w-3 h-3" />
+                      LaTeX: $E = mc^2$
+                    </span>
+                  </label>
+                  <textarea 
+                    value={lang === 'ru' ? contentRu : contentTyv}
+                    onChange={(e) => lang === 'ru' ? setContentRu(e.target.value) : setContentTyv(e.target.value)}
+                    placeholder="Напишите материал лекции..."
+                    className="flex-grow w-full bg-white border border-stone-100 rounded-[2.5rem] p-8 text-stone-700 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all min-h-[400px] leading-relaxed shadow-sm resize-y"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Resizer Handle */}
+          {activeTab === 'edit' && window.innerWidth >= 768 && (
+            <div 
+              onMouseDown={startResizing}
+              className={`w-1.5 h-full bg-stone-100 hover:bg-emerald-400 transition-colors cursor-col-resize flex items-center justify-center group ${isResizing ? 'bg-emerald-500' : ''}`}
+            >
+              <div className="w-px h-8 bg-stone-300 group-hover:bg-white" />
+            </div>
+          )}
+
+          {/* Live Preview Area */}
+          <div 
+            style={{ width: activeTab === 'edit' && window.innerWidth >= 768 ? `${100 - splitWidth}%` : '100%' }}
+            className={`flex-grow bg-white p-6 sm:p-12 overflow-y-auto ${activeTab === 'edit' ? 'hidden md:block' : (activeTab === 'preview' ? 'block' : 'hidden')} border-l border-stone-100`}
+          >
+            <div className="max-w-prose mx-auto">
+              <div className="flex items-center gap-2 mb-10 text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] bg-emerald-50 w-fit px-3 py-1 rounded-full">
+                 <Eye className="w-3.5 h-3.5" />
+                 Предпросмотр
+              </div>
+              
+              <h1 className="text-4xl sm:text-5xl font-serif font-black text-stone-900 mb-10 leading-tight">
+                <MathText text={lang === 'ru' ? titleRu : titleTyv} />
+              </h1>
+
+              <div className="prose prose-stone prose-lg max-w-none prose-p:leading-relaxed">
+                <MathText 
+                  text={lang === 'ru' ? contentRu : contentTyv} 
+                  isHtml 
+                  className="text-stone-700 space-y-6"
+                />
+                {!(lang === 'ru' ? contentRu : contentTyv) && (
+                  <div className="flex flex-col items-center justify-center py-32 text-stone-200 border-2 border-dashed border-stone-100 rounded-[3rem]">
+                    <Layout className="w-16 h-16 mb-4 opacity-50" />
+                    <p className="font-bold">Контент пока пуст...</p>
                   </div>
                 )}
-             </div>
-          </div>
-        )}
-
-        {/* Preview Area (Side-by-side or Tab) */}
-        <div className={`flex-grow bg-white p-6 sm:p-8 overflow-y-auto ${activeTab === 'edit' ? 'hidden md:block' : (activeTab === 'preview' ? 'block' : 'hidden')} border-l border-stone-100`}>
-          <div className="max-w-prose mx-auto">
-            <div className="flex items-center gap-2 mb-8 text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em]">
-               <Eye className="w-4 h-4" />
-               Живой предпросмотр
-            </div>
-            
-            <h1 className="text-4xl font-serif font-black text-stone-900 mb-8 leading-tight">
-              <MathText text={lang === 'ru' ? titleRu : titleTyv} />
-            </h1>
-
-            <div className="prose prose-stone prose-lg max-w-none prose-p:leading-relaxed">
-              <MathText 
-                text={lang === 'ru' ? contentRu : contentTyv} 
-                isHtml 
-                className="text-stone-700 space-y-6"
-              />
-              {!(lang === 'ru' ? contentRu : contentTyv) && (
-                <div className="flex flex-col items-center justify-center py-20 text-stone-300">
-                  <Layout className="w-12 h-12 mb-4" />
-                  <p className="font-bold">Начните вводить текст...</p>
-                </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
