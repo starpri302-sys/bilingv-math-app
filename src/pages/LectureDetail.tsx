@@ -166,6 +166,24 @@ export default function LectureDetail() {
     }
   };
 
+  const handleCommentPaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const blob = items[i].getAsFile();
+        if (!blob) continue;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64 = event.target?.result as string;
+          const imgTag = `<img src="${base64}" class="max-w-full rounded-2xl shadow-md my-4" />`;
+          setNewComment(prev => prev + "\n" + imgTag + "\n");
+        };
+        reader.readAsDataURL(blob);
+      }
+    }
+  };
+
   const handleDeleteComment = async (commentId: string) => {
     if (!window.confirm('Вы уверены, что хотите удалить этот комментарий?')) return;
     try {
@@ -459,6 +477,7 @@ export default function LectureDetail() {
               <textarea
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
+                onPaste={handleCommentPaste}
                 placeholder="Ваш комментарий или вопрос... Поддерживаются математические формулы □"
                 className="w-full bg-stone-50 border border-stone-100 rounded-2xl p-4 min-h-[100px] outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-stone-700 font-medium mb-4"
               />
@@ -513,7 +532,7 @@ export default function LectureDetail() {
                     </div>
                   </div>
                   <div className="text-stone-600 leading-relaxed text-sm">
-                    <MathText text={comment.content} />
+                    <MathText text={comment.content} isHtml />
                   </div>
                 </div>
               </motion.div>

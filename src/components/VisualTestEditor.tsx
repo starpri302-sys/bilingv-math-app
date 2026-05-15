@@ -189,6 +189,22 @@ export default function VisualTestEditor({ initialBlocks = [], onSave }: VisualT
 
   const handlePaste = (e: React.ClipboardEvent) => {
     const items = e.clipboardData.items;
+    const text = e.clipboardData.getData('text');
+
+    // Handle video URL paste
+    if (text && (text.includes('youtube.com') || text.includes('youtu.be') || text.includes('vimeo.com') || text.endsWith('.mp4'))) {
+      const newBlock: VisualBlock = {
+        id: Math.random().toString(36).substr(2, 9),
+        type: 'video',
+        content: '',
+        videoUrl: text,
+        layout: 'full'
+      };
+      setBlocks([...blocks, newBlock]);
+      setSelectedBlockId(newBlock.id);
+      return; 
+    }
+
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf('image') !== -1) {
         const blob = items[i].getAsFile();

@@ -25,6 +25,21 @@ export default function MathText({ text, className, as: Component = 'span', isHt
       // Process text nodes: replace digits and math symbols
       let nodeText = match.replace(/\b(\d+)\b/g, styleDigit);
       nodeText = nodeText.replace(/(\+|-|=|>|<|\*|\/|\^|√)/g, '<span class="font-mono font-black text-emerald-600 scale-110 inline-block mx-0.5">$1</span>');
+      
+      // Detected video links then wrap them
+      nodeText = nodeText.replace(/(https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|vimeo\.com)\/\S+)/g, (url) => {
+        let embedUrl = url;
+        if (url.includes('youtube.com') || url.includes('youtu.be')) {
+          const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
+          embedUrl = `https://www.youtube.com/embed/${videoId}`;
+        } else if (url.includes('vimeo.com')) {
+          const videoId = url.split('/').pop();
+          embedUrl = `https://player.vimeo.com/video/${videoId}`;
+        }
+        
+        return `<div class="my-8 rounded-3xl overflow-hidden shadow-xl aspect-video bg-black"><iframe class="w-full h-full" src="${embedUrl}" allowfullscreen></iframe></div>`;
+      });
+
       return nodeText;
     });
     
