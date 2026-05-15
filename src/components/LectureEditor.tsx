@@ -113,6 +113,28 @@ export default function LectureEditor({
     });
   };
 
+  const handlePaste = (e: React.ClipboardEvent, target: 'ru' | 'tyv') => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const blob = items[i].getAsFile();
+        if (!blob) continue;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64 = event.target?.result as string;
+          const imgTag = `<img src="${base64}" class="w-full rounded-3xl shadow-lg my-8" />`;
+          if (target === 'ru') {
+            setContentRu(prev => prev + "\n" + imgTag + "\n");
+          } else {
+            setContentTyv(prev => prev + "\n" + imgTag + "\n");
+          }
+        };
+        reader.readAsDataURL(blob);
+      }
+    }
+  };
+
   const addQuestion = () => {
     setQuizQuestions([...quizQuestions, {
       text_ru: '',
@@ -434,6 +456,7 @@ export default function LectureEditor({
                   <textarea 
                     value={lang === 'ru' ? contentRu : contentTyv}
                     onChange={(e) => lang === 'ru' ? setContentRu(e.target.value) : setContentTyv(e.target.value)}
+                    onPaste={(e) => handlePaste(e, lang)}
                     placeholder="Напишите материал лекции..."
                     className="flex-grow w-full bg-white border border-stone-100 rounded-[2.5rem] p-8 text-stone-700 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all min-h-[400px] leading-relaxed shadow-sm resize-y"
                   />

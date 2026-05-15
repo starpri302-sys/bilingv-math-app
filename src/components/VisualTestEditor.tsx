@@ -14,7 +14,9 @@ import {
   ChevronRight,
   Settings,
   Columns2,
-  Columns3
+  Columns3,
+  Video,
+  Play
 } from 'lucide-react';
 import {
   DndContext, 
@@ -37,9 +39,10 @@ import MathText from './MathText';
 
 interface VisualBlock {
   id: string;
-  type: 'text' | 'image' | 'question';
+  type: 'text' | 'image' | 'question' | 'video';
   content: string;
   imageUrl?: string;
+  videoUrl?: string;
   questionData?: {
     ru: string;
     tyv: string;
@@ -100,6 +103,7 @@ function SortableBlock({ block, isSelected, onSelect, onRemove }: SortableBlockP
            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black ${block.type === 'question' ? 'bg-emerald-100 text-emerald-600' : 'bg-stone-100 text-stone-400'}`}>
               {block.type === 'text' && <Type className="w-4 h-4" />}
               {block.type === 'image' && <ImageIcon className="w-4 h-4" />}
+              {block.type === 'video' && <Video className="w-4 h-4" />}
               {block.type === 'question' && <HelpCircle className="w-4 h-4" />}
            </div>
         </div>
@@ -130,6 +134,22 @@ function SortableBlock({ block, isSelected, onSelect, onRemove }: SortableBlockP
                  <>
                    <ImageIcon className="w-10 h-10 mb-2 opacity-50" />
                    <span className="text-xs font-bold uppercase tracking-widest text-stone-400">Нет изображения</span>
+                 </>
+               )}
+             </div>
+           )}
+
+           {block.type === 'video' && (
+             <div className="relative aspect-video bg-stone-900 rounded-2xl flex flex-col items-center justify-center text-white/20 overflow-hidden">
+               {block.videoUrl ? (
+                 <div className="flex flex-col items-center gap-2">
+                    <Play className="w-12 h-12 text-emerald-500" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-stone-500">{block.videoUrl}</span>
+                 </div>
+               ) : (
+                 <>
+                   <Video className="w-10 h-10 mb-2 opacity-50" />
+                   <span className="text-xs font-bold uppercase tracking-widest">Нет видео</span>
                  </>
                )}
              </div>
@@ -166,6 +186,47 @@ function SortableBlock({ block, isSelected, onSelect, onRemove }: SortableBlockP
 export default function VisualTestEditor({ initialBlocks = [], onSave }: VisualTestEditorProps) {
   const [blocks, setBlocks] = useState<VisualBlock[]>(initialBlocks);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    const text = e.clipboardData.getData('text');
+
+    // Handle video URL paste
+    if (text && (text.includes('youtube.com') || text.includes('youtu.be') || text.includes('vimeo.com') || text.endsWith('.mp4'))) {
+      const newBlock: VisualBlock = {
+        id: Math.random().toString(36).substr(2, 9),
+        type: 'video',
+        content: '',
+        videoUrl: text,
+        layout: 'full'
+      };
+      setBlocks([...blocks, newBlock]);
+      setSelectedBlockId(newBlock.id);
+      return; 
+    }
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const blob = items[i].getAsFile();
+        if (!blob) continue;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64 = event.target?.result as string;
+          const newBlock: VisualBlock = {
+            id: Math.random().toString(36).substr(2, 9),
+            type: 'image',
+            content: '',
+            imageUrl: base64,
+            layout: 'full'
+          };
+          setBlocks([...blocks, newBlock]);
+          setSelectedBlockId(newBlock.id);
+        };
+        reader.readAsDataURL(blob);
+      }
+    }
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -222,7 +283,10 @@ export default function VisualTestEditor({ initialBlocks = [], onSave }: VisualT
   const selectedBlock = blocks.find(b => b.id === selectedBlockId);
 
   return (
-    <div className="flex flex-col lg:flex-row gap-8 min-h-[700px] bg-stone-50 p-6 rounded-[2.5rem] border border-stone-200 shadow-inner">
+    <div 
+      onPaste={handlePaste}
+      className="flex flex-col lg:flex-row gap-8 min-h-[700px] bg-stone-50 p-6 rounded-[2.5rem] border border-stone-200 shadow-inner"
+    >
       {/* Visual Canvas Area */}
       <div className="flex-grow flex flex-col gap-6">
         <div className="flex items-center justify-between bg-white p-6 rounded-[2rem] shadow-sm border border-stone-100">
@@ -245,6 +309,13 @@ export default function VisualTestEditor({ initialBlocks = [], onSave }: VisualT
                   title="Добавить изображение"
                 >
                   <ImageIcon className="w-5 h-5" />
+                </button>
+                <button 
+                  onClick={() => addBlock('video')}
+                  className="p-3 bg-stone-50 text-stone-600 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 transition-all border border-stone-100"
+                  title="Добавить видео"
+                >
+                  <Video className="w-5 h-5" />
                 </button>
                 <button 
                   onClick={() => addBlock('question')}
@@ -342,6 +413,23 @@ export default function VisualTestEditor({ initialBlocks = [], onSave }: VisualT
                         placeholder="https://example.com/image.jpg"
                       />
                    </div>
+                   <p className="text-[10px] text-stone-400 italic">Вы также можете просто вставить изображение из буфера обмена (Ctrl+V)</p>
+                </div>
+              )}
+
+              {selectedBlock.type === 'video' && (
+                <div className="space-y-4">
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Ссылка на видео (YouTube / Vimeo / Direct)</label>
+                      <input 
+                        type="url"
+                        value={selectedBlock.videoUrl || ''}
+                        onChange={(e) => updateBlock(selectedBlock.id, { videoUrl: e.target.value })}
+                        className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 transition-all"
+                        placeholder="https://youtube.com/watch?v=..."
+                      />
+                   </div>
+                   <p className="text-[10px] text-stone-400 italic">Поддерживаются ссылки на YouTube, Vimeo и прямые ссылки на MP4.</p>
                 </div>
               )}
 
