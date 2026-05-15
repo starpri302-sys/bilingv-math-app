@@ -33,10 +33,9 @@ interface Lecture {
 
 interface VisualBlock {
   id: string;
-  type: 'text' | 'image' | 'question' | 'video';
+  type: 'text' | 'image' | 'question';
   content: string;
   imageUrl?: string;
-  videoUrl?: string;
   questionData?: {
     ru: string;
     tyv: string;
@@ -166,24 +165,6 @@ export default function LectureDetail() {
     }
   };
 
-  const handleCommentPaste = (e: React.ClipboardEvent) => {
-    const items = e.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') !== -1) {
-        const blob = items[i].getAsFile();
-        if (!blob) continue;
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const base64 = event.target?.result as string;
-          const imgTag = `<img src="${base64}" class="max-w-full rounded-2xl shadow-md my-4" />`;
-          setNewComment(prev => prev + "\n" + imgTag + "\n");
-        };
-        reader.readAsDataURL(blob);
-      }
-    }
-  };
-
   const handleDeleteComment = async (commentId: string) => {
     if (!window.confirm('Вы уверены, что хотите удалить этот комментарий?')) return;
     try {
@@ -292,31 +273,6 @@ export default function LectureDetail() {
                       {block.type === 'image' && block.imageUrl && (
                         <img src={block.imageUrl} alt="" className="w-full rounded-[2.5rem] shadow-lg mb-8" />
                       )}
-                      {block.type === 'video' && block.videoUrl && (
-                        <div className="mb-8 rounded-[2.5rem] overflow-hidden shadow-2xl bg-black aspect-video">
-                          {block.videoUrl.includes('youtube.com') || block.videoUrl.includes('youtu.be') ? (
-                            <iframe
-                              className="w-full h-full"
-                              src={`https://www.youtube.com/embed/${block.videoUrl.split('v=')[1]?.split('&')[0] || block.videoUrl.split('/').pop()}`}
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                              allowFullScreen
-                            />
-                          ) : block.videoUrl.includes('vimeo.com') ? (
-                            <iframe
-                              className="w-full h-full"
-                              src={`https://player.vimeo.com/video/${block.videoUrl.split('/').pop()}`}
-                              allow="autoplay; fullscreen; picture-in-picture"
-                              allowFullScreen
-                            />
-                          ) : (
-                            <video 
-                              src={block.videoUrl} 
-                              controls 
-                              className="w-full h-full"
-                            />
-                          )}
-                        </div>
-                      )}
                       {block.type === 'question' && block.questionData && (
                         <div className="mt-8">
                            <LectureQuiz 
@@ -365,51 +321,28 @@ export default function LectureDetail() {
 
           {/* Resources Section */}
           {resources.length > 0 && (
-            <div className="px-8 sm:px-12 pb-12 space-y-6 border-t border-stone-50 pt-12">
-               <h3 className="text-xs font-black text-stone-400 uppercase tracking-widest flex items-center gap-2">
+            <div className="px-8 sm:px-12 pb-12">
+               <h3 className="text-xs font-black text-stone-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                  <FileText className="w-4 h-4" />
                  Дополнительные материалы
                </h3>
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {resources.map((res) => (
-                    res.type === 'video' ? (
-                      <div key={res.id} className="col-span-full relative bg-black rounded-3xl overflow-hidden shadow-xl aspect-video border border-stone-200">
-                         {res.url.includes('youtube.com') || res.url.includes('youtu.be') ? (
-                           <iframe
-                             className="w-full h-full"
-                             src={`https://www.youtube.com/embed/${res.url.split('v=')[1]?.split('&')[0] || res.url.split('/').pop()}`}
-                             allowFullScreen
-                           />
-                         ) : res.url.includes('vimeo.com') ? (
-                           <iframe
-                             className="w-full h-full"
-                             src={`https://player.vimeo.com/video/${res.url.split('/').pop()}`}
-                             allowFullScreen
-                           />
-                         ) : (
-                           <video src={res.url} controls className="w-full h-full" />
-                         )}
-                         <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-white/20">
-                            Видео-материал
-                         </div>
-                      </div>
-                    ) : (
-                      <a 
-                        key={res.id}
-                        href={res.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-4 p-4 bg-stone-50 rounded-2xl border border-stone-100 hover:border-emerald-600 hover:bg-emerald-50 transition-all group"
-                      >
-                         <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-stone-400 group-hover:text-emerald-600 shadow-sm border border-stone-100">
-                            {res.type === 'pdf' ? <FileText className="w-5 h-5" /> : <div className="w-2 h-2 bg-emerald-500 rounded-full" />}
-                         </div>
-                         <div className="flex-grow min-w-0">
-                            <p className="text-xs font-bold text-stone-900 truncate">{res.title}</p>
-                            <p className="text-[10px] text-stone-400 uppercase tracking-widest">{res.type}</p>
-                         </div>
-                      </a>
-                    )
+                    <a 
+                      key={res.id}
+                      href={res.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-4 p-4 bg-stone-50 rounded-2xl border border-stone-100 hover:border-emerald-600 hover:bg-emerald-50 transition-all group"
+                    >
+                       <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-stone-400 group-hover:text-emerald-600 shadow-sm border border-stone-100">
+                          {res.type === 'pdf' ? <FileText className="w-5 h-5" /> : <div className="w-2 h-2 bg-emerald-500 rounded-full" />}
+                       </div>
+                       <div className="flex-grow min-w-0">
+                          <p className="text-xs font-bold text-stone-900 truncate">{res.title}</p>
+                          <p className="text-[10px] text-stone-400 uppercase tracking-widest">{res.type}</p>
+                       </div>
+                    </a>
                   ))}
                </div>
             </div>
@@ -477,7 +410,6 @@ export default function LectureDetail() {
               <textarea
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                onPaste={handleCommentPaste}
                 placeholder="Ваш комментарий или вопрос... Поддерживаются математические формулы □"
                 className="w-full bg-stone-50 border border-stone-100 rounded-2xl p-4 min-h-[100px] outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-stone-700 font-medium mb-4"
               />
@@ -532,7 +464,7 @@ export default function LectureDetail() {
                     </div>
                   </div>
                   <div className="text-stone-600 leading-relaxed text-sm">
-                    <MathText text={comment.content} isHtml />
+                    <MathText text={comment.content} />
                   </div>
                 </div>
               </motion.div>

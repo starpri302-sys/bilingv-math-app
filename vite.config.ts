@@ -7,9 +7,6 @@ export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
     plugins: [react(), tailwindcss()],
-    optimizeDeps: {
-      include: ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities', 'motion/react']
-    },
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },
