@@ -1523,7 +1523,14 @@ async function startServer() {
   app.post("/api/terms", async (req, res) => {
     const { id, grade, subject_id, status, translations, user_role, user_id, created_by } = req.body;
     const isModerator = user_role === 'chief_editor' || user_role === 'super_admin';
-    const finalStatus = isModerator ? (status || 'published') : 'pending';
+    let finalStatus;
+    if (status === 'draft') {
+      finalStatus = 'draft';
+    } else if (isModerator) {
+      finalStatus = status || 'published';
+    } else {
+      finalStatus = 'pending';
+    }
     const creatorId = user_id || created_by || 'system';
 
     const client = await pool.connect();
@@ -1584,7 +1591,14 @@ async function startServer() {
       ]);
 
       const isModerator = user_role === 'chief_editor' || user_role === 'super_admin';
-      const finalStatus = isModerator ? (status || 'published') : 'pending';
+      let finalStatus;
+      if (status === 'draft') {
+        finalStatus = 'draft';
+      } else if (isModerator) {
+        finalStatus = status || 'published';
+      } else {
+        finalStatus = 'pending';
+      }
       
       await client.query(`
         UPDATE terms SET grade = $1, subject_id = $2, status = $3 WHERE id = $4

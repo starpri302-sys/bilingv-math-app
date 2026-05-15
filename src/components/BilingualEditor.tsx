@@ -4,7 +4,7 @@ import 'react-quill-new/dist/quill.snow.css';
 import { useAuth } from '../store/authContext';
 import { api } from '../services/api';
 import { motion, AnimatePresence } from 'motion/react';
-import { Save, X, Book, Lightbulb, Info, Languages, PlusCircle, Image as ImageIcon, Video as VideoIcon, Upload, Trash2 } from 'lucide-react';
+import { Save, X, Book, Lightbulb, Info, Languages, PlusCircle, Image as ImageIcon, Video as VideoIcon, Upload, Trash2, FileText } from 'lucide-react';
 
 interface BilingualEditorProps {
   onClose: () => void;
@@ -82,8 +82,8 @@ export default function BilingualEditor({ onClose, initialData }: BilingualEdito
     setFormData({ ...formData, subject_id: subjectId });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent, statusOverride?: string) => {
+    if (e) e.preventDefault();
     if (!user) return;
 
     // Check if at least one language has a name
@@ -99,19 +99,28 @@ export default function BilingualEditor({ onClose, initialData }: BilingualEdito
       };
 
       const isModerator = profile?.role === 'chief_editor' || profile?.role === 'super_admin';
-      const newStatus = isModerator ? 'published' : 'pending';
+      
+      // Decision logic for status
+      let finalStatus;
+      if (statusOverride === 'draft') {
+        finalStatus = 'draft';
+      } else if (isModerator) {
+        finalStatus = 'published';
+      } else {
+        finalStatus = 'pending';
+      }
 
       if (initialData?.id) {
         await api.updateTerm(initialData.id, {
           ...formData,
-          status: isModerator ? (initialData.status || 'published') : 'pending'
+          status: finalStatus
         }, userInfo);
       } else {
         await api.createTerm({
           ...formData,
           id: Math.random().toString(36).substr(2, 9),
           user_id: user.id,
-          status: newStatus
+          status: finalStatus
         }, profile?.role);
       }
       onClose();
@@ -319,20 +328,28 @@ export default function BilingualEditor({ onClose, initialData }: BilingualEdito
           </div>
         </div>
 
-        <footer className="p-6 border-t border-stone-100 bg-stone-50 flex justify-end gap-4">
+        <footer className="p-6 border-t border-stone-100 bg-stone-50 flex justify-end gap-3 sm:gap-4">
           <button
             onClick={onClose}
-            className="px-6 py-3 rounded-2xl text-stone-500 hover:text-stone-700 font-bold text-sm transition-all"
+            className="px-4 sm:px-6 py-3 rounded-2xl text-stone-500 hover:text-stone-700 font-bold text-sm transition-all"
           >
             Отмена
           </button>
           <button
-            onClick={handleSubmit}
+            onClick={() => handleSubmit(undefined, 'draft')}
             disabled={saving || !Object.values(formData.translations).some((t: any) => t.name.trim() !== '')}
-            className="flex items-center gap-2 bg-emerald-600 text-white px-8 py-3 rounded-2xl hover:bg-emerald-700 transition-all shadow-md hover:shadow-lg font-bold disabled:opacity-50"
+            className="flex items-center gap-2 bg-stone-200 text-stone-700 px-4 sm:px-6 py-3 rounded-2xl hover:bg-stone-300 transition-all font-bold text-sm disabled:opacity-50"
+          >
+            <FileText className="w-5 h-5" />
+            Черновик
+          </button>
+          <button
+            onClick={(e) => handleSubmit(e)}
+            disabled={saving || !Object.values(formData.translations).some((t: any) => t.name.trim() !== '')}
+            className="flex items-center gap-2 bg-emerald-600 text-white px-6 sm:px-8 py-3 rounded-2xl hover:bg-emerald-700 transition-all shadow-md hover:shadow-lg font-bold text-sm disabled:opacity-50"
           >
             <Save className="w-5 h-5" />
-            {saving ? 'Сохранение...' : 'Сохранить'}
+            {saving ? 'Сохранение...' : (profile?.role === 'chief_editor' || profile?.role === 'super_admin' ? 'Опубликовать' : 'На проверку')}
           </button>
         </footer>
       </motion.div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../store/authContext';
 import { api } from '../services/api';
 import { motion } from 'motion/react';
-import { User, Mail, School, GraduationCap, Save, ShieldCheck, Camera, Trash2, BookOpen, Clock, CheckCircle, Key, Eye, EyeOff, Lock, ChevronDown, Heart } from 'lucide-react';
+import { User, Mail, School, GraduationCap, Save, ShieldCheck, Camera, Trash2, BookOpen, Clock, CheckCircle, Key, Eye, EyeOff, Lock, ChevronDown, Heart, FileText } from 'lucide-react';
 import UserAvatar from '../components/UserAvatar';
 import TermCard from '../components/TermCard';
 import { AnimatePresence } from 'motion/react';
@@ -417,11 +417,13 @@ export default function Profile() {
                       <div className={`absolute -top-2 -right-2 z-10 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm border ${
                         term.status === 'published' 
                           ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
+                          : term.status === 'draft'
+                          ? 'bg-stone-100 text-stone-600 border-stone-200'
                           : 'bg-amber-100 text-amber-700 border-amber-200'
                       }`}>
                         <div className="flex items-center gap-1">
-                          {term.status === 'published' ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                          {term.status === 'published' ? 'Опубликован' : 'На проверке'}
+                          {term.status === 'published' ? <CheckCircle className="w-3 h-3" /> : (term.status === 'draft' ? <FileText className="w-3 h-3" /> : <Clock className="w-3 h-3" />)}
+                          {term.status === 'published' ? 'Опубликован' : (term.status === 'draft' ? 'Черновик' : 'На проверке')}
                         </div>
                       </div>
                       <TermCard term={term} language="ru" />

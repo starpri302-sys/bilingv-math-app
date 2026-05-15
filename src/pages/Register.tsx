@@ -147,16 +147,21 @@ export default function Register() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-stone-400 ml-1">Учебное заведение</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-stone-400 ml-1">Класс</label>
               <div className="relative">
-                <School className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400" />
-                <input
-                  type="text"
-                  value={formData.school}
-                  onChange={(e) => setFormData({ ...formData, school: e.target.value })}
-                  className="w-full pl-12 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
-                  placeholder="Школа №1 или Университет"
-                />
+                <GraduationCap className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400" />
+                <select
+                  required
+                  value={formData.grade}
+                  onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
+                  className="w-full pl-12 pr-10 py-3 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium appearance-none"
+                >
+                  <option value="" disabled>Выберите класс</option>
+                  {Array.from({ length: 11 }, (_, i) => (i + 1).toString()).map(g => (
+                    <option key={g} value={g}>{g} класс</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
               </div>
             </div>
           </div>
