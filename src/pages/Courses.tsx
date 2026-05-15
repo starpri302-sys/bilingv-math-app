@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { GraduationCap, BookOpen, Clock, ChevronRight, Lock, Sparkles, Search, Plus, X, ChevronLeft, FileText, CheckCircle2, Edit3, Trash2, Trophy, BarChart3, HelpCircle, FolderPlus, Layers } from 'lucide-react';
+import { GraduationCap, BookOpen, Clock, ChevronRight, Lock, Sparkles, Search, Plus, X, ChevronLeft, FileText, CheckCircle2, Edit3, Trash2, Trophy, BarChart3, HelpCircle, FolderPlus, Layers, Users } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../store/authContext';
 import SEO from '../components/SEO';
 import LectureEditor from '../components/LectureEditor';
 import VisualTestEditor from '../components/VisualTestEditor';
+import Pagination from '../components/Pagination';
+
+const COURSES_PER_PAGE = 9;
+const LECTURES_PER_PAGE = 10;
 
 interface Course {
   id: string;
@@ -31,6 +35,7 @@ interface Lecture {
   is_free: number;
   item_type: 'theory' | 'test';
   quiz?: any;
+  resources?: any[];
 }
 
 interface CourseModule {
@@ -49,6 +54,8 @@ export default function Courses() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [lecturePage, setLecturePage] = useState(1);
   
   // Creation States
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -71,11 +78,29 @@ export default function Courses() {
   const [showModuleModal, setShowModuleModal] = useState(false);
   const [editingModule, setEditingModule] = useState<CourseModule | null>(null);
   const [newModule, setNewModule] = useState({ title_ru: '', title_tyv: '', order_index: 0 });
+  const [inviteCode, setInviteCode] = useState('');
+  const [joining, setJoining] = useState(false);
 
   const { isPro, isTeacher, user, profile } = useAuth();
 
+  const handleJoinClass = async () => {
+    if (!inviteCode.trim() || !user) return;
+    setJoining(true);
+    setCurrentPage(1);
+    try {
+      await api.joinClass(inviteCode.trim());
+      alert('Вы успешно присоединились к классу!');
+      setInviteCode('');
+    } catch (err: any) {
+      alert(err.message || 'Не удалось присоединиться к классу. Проверьте код.');
+    } finally {
+      setJoining(false);
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
+    setCurrentPage(1);
     try {
       const [coursesData, subjectsData, progressData] = await Promise.all([
         api.getCourses(),
@@ -220,6 +245,10 @@ export default function Courses() {
 
       if (lectureId && data.quiz) {
         await api.saveLectureQuiz(lectureId, data.quiz);
+      }
+
+      if (lectureId && data.resources) {
+        await api.saveLectureResources(lectureId, data.resources);
       } else if (lectureId && data.blocks) {
         // For visual tests, we store blocks as JSON in content
         // Or we can have a separate structure. For now, let's store JSON in content_ru
@@ -287,6 +316,12 @@ export default function Courses() {
     const matchesSubject = !selectedSubject || (c as any).subject_id === selectedSubject;
     return matchesSearch && matchesSubject;
   });
+
+  const totalCoursePages = Math.ceil(filteredCourses.length / COURSES_PER_PAGE);
+  const currentCourses = filteredCourses.slice(
+    (currentPage - 1) * COURSES_PER_PAGE,
+    currentPage * COURSES_PER_PAGE
+  );
 
   if (selectedCourse) {
     return (
@@ -501,6 +536,7 @@ export default function Courses() {
                   initialContentTyv={editingLecture?.content_tyv}
                   initialIsFree={editingLecture?.is_free === 1}
                   initialQuiz={editingLecture?.quiz}
+                  initialResources={editingLecture?.resources}
                 />
               )}
             </motion.div>
@@ -554,8 +590,10 @@ export default function Courses() {
                                 const loadAndEdit = async () => {
                                   const fullLec = await api.getLecture(lecture.id);
                                   let fullQuiz = null;
+                                  let lResources = [];
                                   try { fullQuiz = await api.getLectureQuiz(lecture.id); } catch(e) {}
-                                  setEditingLecture({ ...fullLec, quiz: fullQuiz });
+                                  try { lResources = await api.getLectureResources(lecture.id); } catch(e) {}
+                                  setEditingLecture({ ...fullLec, quiz: fullQuiz, resources: lResources });
                                   setShowLectureEditor(true);
                                 };
                                 loadAndEdit();
@@ -575,7 +613,10 @@ export default function Courses() {
                       <div className="space-y-6">
                         <h3 className="text-xl font-serif font-black text-stone-400">Вне модулей</h3>
                         <div className="space-y-4">
-                          {lectures.filter(l => !l.module_id).map((lecture, idx) => (
+                          {lectures
+                            .filter(l => !l.module_id)
+                            .slice((lecturePage - 1) * LECTURES_PER_PAGE, lecturePage * LECTURES_PER_PAGE)
+                            .map((lecture, idx) => (
                              <LectureCard 
                               key={lecture.id} 
                               lecture={lecture} 
@@ -586,8 +627,10 @@ export default function Courses() {
                                 const loadAndEdit = async () => {
                                   const fullLec = await api.getLecture(lecture.id);
                                   let fullQuiz = null;
+                                  let lResources = [];
                                   try { fullQuiz = await api.getLectureQuiz(lecture.id); } catch(e) {}
-                                  setEditingLecture({ ...fullLec, quiz: fullQuiz });
+                                  try { lResources = await api.getLectureResources(lecture.id); } catch(e) {}
+                                  setEditingLecture({ ...fullLec, quiz: fullQuiz, resources: lResources });
                                   setShowLectureEditor(true);
                                 };
                                 loadAndEdit();
@@ -596,6 +639,14 @@ export default function Courses() {
                             />
                           ))}
                         </div>
+                        <Pagination 
+                          currentPage={lecturePage}
+                          totalPages={Math.ceil(lectures.filter(l => !l.module_id).length / LECTURES_PER_PAGE)}
+                          onPageChange={(page) => {
+                            setLecturePage(page);
+                            window.scrollTo({ top: 600, behavior: 'smooth' });
+                          }}
+                        />
                       </div>
                     )}
                   </div>
@@ -623,7 +674,36 @@ export default function Courses() {
       
       {/* Hero Header */}
       <div className="bg-white border-b border-stone-200 pt-12 pb-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-stone-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-stone-900 relative">
+          
+          {/* Join Class Tool for Students */}
+          {!isTeacher && !isPro && user && (
+            <div className="absolute top-0 right-0 hidden lg:block">
+               <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 shadow-sm max-w-xs text-left">
+                  <h4 className="text-xs font-black text-emerald-900 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Вступить в класс
+                  </h4>
+                  <p className="text-[10px] text-emerald-700 font-medium mb-4">Введите код, полученный от преподавателя, чтобы получить доступ к заданиям.</p>
+                  <div className="flex gap-2">
+                    <input 
+                      value={inviteCode}
+                      onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                      placeholder="КОД"
+                      className="w-full bg-white border border-emerald-200 rounded-xl px-4 py-2 text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                    <button 
+                      onClick={handleJoinClass}
+                      disabled={joining || !inviteCode}
+                      className="bg-emerald-600 text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                    >
+                      {joining ? '...' : 'ОК'}
+                    </button>
+                  </div>
+               </div>
+            </div>
+          )}
+
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -648,13 +728,13 @@ export default function Courses() {
                   type="text"
                   placeholder="Поиск курсов..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                   className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 pl-12 pr-12 outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-medium"
                 />
              </div>
              <select 
               value={selectedSubject || ''}
-              onChange={(e) => setSelectedSubject(e.target.value || null)}
+              onChange={(e) => { setSelectedSubject(e.target.value || null); setCurrentPage(1); }}
               className="bg-white border border-stone-200 rounded-2xl px-6 py-4 outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold text-stone-700"
              >
                <option value="">Все предметы</option>
@@ -838,98 +918,109 @@ export default function Courses() {
               <div key={i} className="bg-white rounded-3xl p-8 h-64 animate-pulse border border-stone-200" />
             ))}
           </div>
-        ) : filteredCourses.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredCourses.map((course, idx) => (
-              <motion.div
-                key={course.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: idx * 0.1 }}
-                className="group bg-white rounded-3xl border border-stone-200 overflow-hidden hover:shadow-xl transition-all duration-300"
-              >
-                <div className="p-8 pb-4">
-                  <div className="flex justify-between items-start mb-6">
-                    <div className="p-3 bg-stone-50 rounded-2xl border border-stone-100 text-emerald-600">
-                      <BookOpen className="w-6 h-6" />
-                    </div>
-                    {isPro ? (
-                       <div className="flex items-center gap-2">
-                          <button 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setEditingCourse(course);
-                              setNewCourse({
-                                title_ru: course.title_ru,
-                                title_tyv: course.title_tyv,
-                                desc_ru: course.description_ru,
-                                desc_tyv: course.description_tyv,
-                                subject_id: course.subject_id
-                              });
-                              setShowCreateModal(true);
-                            }}
-                            className="p-2 bg-stone-50 rounded-xl text-stone-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setShowDeleteConfirm(course.id);
-                            }}
-                            className="p-2 bg-stone-50 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                       </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-600 rounded-xl border border-amber-100 text-[10px] font-black uppercase tracking-widest">
-                        <Lock className="w-3 h-3" />
-                        Pro
+        ) : currentCourses.length > 0 ? (
+          <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {currentCourses.map((course, idx) => (
+                <motion.div
+                  key={course.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: idx * 0.1 }}
+                  className="group bg-white rounded-3xl border border-stone-200 overflow-hidden hover:shadow-xl transition-all duration-300"
+                >
+                  <div className="p-8 pb-4">
+                    <div className="flex justify-between items-start mb-6">
+                      <div className="p-3 bg-stone-50 rounded-2xl border border-stone-100 text-emerald-600">
+                        <BookOpen className="w-6 h-6" />
                       </div>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <h2 className="text-xl font-bold text-stone-900 group-hover:text-emerald-600 transition-colors mb-1">
-                        {course.title_ru}
-                      </h2>
-
-                      <p className="text-sm font-medium text-stone-400 italic">
-                        {course.title_tyv}
-                      </p>
+                      {isPro ? (
+                         <div className="flex items-center gap-2">
+                            <button 
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setEditingCourse(course);
+                                setNewCourse({
+                                  title_ru: course.title_ru,
+                                  title_tyv: course.title_tyv,
+                                  desc_ru: course.description_ru,
+                                  desc_tyv: course.description_tyv,
+                                  subject_id: course.subject_id
+                                });
+                                setShowCreateModal(true);
+                              }}
+                              className="p-2 bg-stone-50 rounded-xl text-stone-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setShowDeleteConfirm(course.id);
+                              }}
+                              className="p-2 bg-stone-50 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                         </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-600 rounded-xl border border-amber-100 text-[10px] font-black uppercase tracking-widest">
+                          <Lock className="w-3 h-3" />
+                          Pro
+                        </div>
+                      )}
                     </div>
-                    <div className="bg-stone-50/50 rounded-2xl p-4 border border-stone-100/50">
-                      <p className="text-stone-600 text-sm line-clamp-2 leading-relaxed">
-                        {course.description_ru}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <h2 className="text-xl font-bold text-stone-900 group-hover:text-emerald-600 transition-colors mb-1">
+                          {course.title_ru}
+                        </h2>
 
-                <div className="px-8 pb-8 pt-4">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-4 text-xs text-stone-400 font-medium tracking-wide">
-                      <div className="flex items-center gap-1.5 bg-stone-100/50 px-2.5 py-1 rounded-lg">
-                        <Sparkles className="w-3 h-3 text-emerald-500" />
-                        {course.subject_name_ru}
+                        <p className="text-sm font-medium text-stone-400 italic">
+                          {course.title_tyv}
+                        </p>
+                      </div>
+                      <div className="bg-stone-50/50 rounded-2xl p-4 border border-stone-100/50">
+                        <p className="text-stone-600 text-sm line-clamp-2 leading-relaxed">
+                          {course.description_ru}
+                        </p>
                       </div>
                     </div>
                   </div>
-                  
-                  <Link 
-                    to={`/courses/${course.id}`}
-                    className="w-full flex items-center justify-center gap-2 bg-stone-900 text-white rounded-2xl py-4 font-bold hover:bg-emerald-600 transition-all shadow-lg active:scale-95"
-                  >
-                    Перейти к лекциям
-                    <ChevronRight className="w-4 h-4" />
-                  </Link>
-                </div>
-              </motion.div>
-            ))}
+
+                  <div className="px-8 pb-8 pt-4">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-4 text-xs text-stone-400 font-medium tracking-wide">
+                        <div className="flex items-center gap-1.5 bg-stone-100/50 px-2.5 py-1 rounded-lg">
+                          <Sparkles className="w-3 h-3 text-emerald-500" />
+                          {course.subject_name_ru}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <Link 
+                      to={`/courses/${course.id}`}
+                      className="w-full flex items-center justify-center gap-2 bg-stone-900 text-white rounded-2xl py-4 font-bold hover:bg-emerald-600 transition-all shadow-lg active:scale-95"
+                    >
+                      Перейти к лекциям
+                      <ChevronRight className="w-4 h-4" />
+                    </Link>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+            
+            <Pagination 
+              currentPage={currentPage}
+              totalPages={totalCoursePages}
+              onPageChange={(page) => {
+                setCurrentPage(page);
+                window.scrollTo({ top: 400, behavior: 'smooth' });
+              }}
+            />
           </div>
         ) : (
           <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-stone-200">

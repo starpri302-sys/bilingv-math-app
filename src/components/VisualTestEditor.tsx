@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, Reorder, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Plus, 
   Trash2, 
@@ -12,8 +12,27 @@ import {
   Maximize2,
   Minimize2,
   ChevronRight,
-  Settings
+  Settings,
+  Columns2,
+  Columns3
 } from 'lucide-react';
+import {
+  DndContext, 
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import MathText from './MathText';
 
 interface VisualBlock {
@@ -27,6 +46,7 @@ interface VisualBlock {
     options: { text_ru: string; text_tyv: string; is_correct: boolean; id: string }[];
   };
   layout?: 'full' | 'half' | 'third';
+  columnCount?: 1 | 2 | 3;
 }
 
 interface VisualTestEditorProps {
@@ -34,9 +54,140 @@ interface VisualTestEditorProps {
   onSave: (blocks: VisualBlock[]) => void;
 }
 
+interface SortableBlockProps {
+  block: VisualBlock;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+  onRemove: (id: string) => void;
+}
+
+function SortableBlock({ block, isSelected, onSelect, onRemove }: SortableBlockProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: block.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : 1,
+  };
+
+  const getWidthClass = () => {
+    switch (block.layout) {
+      case 'half': return 'w-full md:w-[calc(50%-0.5rem)]';
+      case 'third': return 'w-full md:w-[calc(33.33%-0.67rem)]';
+      default: return 'w-full';
+    }
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`${getWidthClass()} group relative bg-white rounded-3xl border-2 transition-all p-4 cursor-default ${isSelected ? 'border-emerald-500 ring-4 ring-emerald-500/10 shadow-xl' : 'border-white hover:border-stone-200 shadow-sm'} ${isDragging ? 'opacity-50 scale-95' : ''}`}
+      onClick={() => onSelect(block.id)}
+    >
+      <div className="flex gap-4">
+        <div className="w-8 shrink-0 flex flex-col items-center gap-2">
+           <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1">
+             <GripVertical className="w-5 h-5 text-stone-300 group-hover:text-stone-400" />
+           </div>
+           <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black ${block.type === 'question' ? 'bg-emerald-100 text-emerald-600' : 'bg-stone-100 text-stone-400'}`}>
+              {block.type === 'text' && <Type className="w-4 h-4" />}
+              {block.type === 'image' && <ImageIcon className="w-4 h-4" />}
+              {block.type === 'question' && <HelpCircle className="w-4 h-4" />}
+           </div>
+        </div>
+
+        <div className="flex-grow min-w-0">
+           {block.type === 'text' && (
+             <div 
+               className="p-2"
+               style={{ 
+                 columnCount: block.columnCount || 1, 
+                 columnGap: '2rem',
+                 columnRule: block.columnCount && block.columnCount > 1 ? '1px solid #f1f1f1' : 'none'
+               }}
+             >
+                {block.content ? (
+                  <div className="text-stone-700 leading-relaxed text-sm"><MathText text={block.content} /></div>
+                ) : (
+                  <span className="text-stone-300 italic text-sm">Пустой текстовый блок...</span>
+                )}
+             </div>
+           )}
+
+           {block.type === 'image' && (
+             <div className="relative aspect-video bg-stone-50 rounded-2xl border-2 border-dashed border-stone-200 flex flex-col items-center justify-center text-stone-300 overflow-hidden">
+               {block.imageUrl ? (
+                 <img src={block.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+               ) : (
+                 <>
+                   <ImageIcon className="w-10 h-10 mb-2 opacity-50" />
+                   <span className="text-xs font-bold uppercase tracking-widest text-stone-400">Нет изображения</span>
+                 </>
+               )}
+             </div>
+           )}
+
+           {block.type === 'question' && (
+             <div className="p-2 space-y-4">
+                <div className="font-serif font-black text-stone-900 border-b border-stone-100 pb-2 flex items-center justify-between">
+                   <span>Вопрос</span>
+                   {block.questionData?.ru ? (
+                     <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                   ) : (
+                     <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
+                   )}
+                </div>
+                <p className="text-stone-600 line-clamp-2 italic text-sm">
+                  {block.questionData?.ru || 'Текст вопроса не заполнен...'}
+                </p>
+             </div>
+           )}
+        </div>
+
+        <button 
+          onClick={(e) => { e.stopPropagation(); onRemove(block.id); }}
+          className="opacity-0 group-hover:opacity-100 p-2 text-stone-300 hover:text-rose-500 transition-all bg-stone-50 rounded-xl self-start"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function VisualTestEditor({ initialBlocks = [], onSave }: VisualTestEditorProps) {
   const [blocks, setBlocks] = useState<VisualBlock[]>(initialBlocks);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setBlocks((items) => {
+        const oldIndex = items.findIndex((i) => i.id === active.id);
+        const newIndex = items.findIndex((i) => i.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
 
   const addBlock = (type: VisualBlock['type']) => {
     const newBlock: VisualBlock = {
@@ -113,76 +264,29 @@ export default function VisualTestEditor({ initialBlocks = [], onSave }: VisualT
           </div>
         </div>
 
-        <div className="flex-grow space-y-4 overflow-y-auto max-h-[700px] pr-2 custom-scrollbar">
-          <Reorder.Group axis="y" values={blocks} onReorder={setBlocks} className="space-y-4">
-          {blocks.map((block) => (
-            <Reorder.Item 
-              key={block.id} 
-              value={block}
-              className={`group relative bg-white rounded-3xl border-2 transition-all p-4 cursor-default ${selectedBlockId === block.id ? 'border-emerald-500 ring-4 ring-emerald-500/10 shadow-xl' : 'border-white hover:border-stone-200 shadow-sm'}`}
-              onClick={() => setSelectedBlockId(block.id)}
+        <div className="flex-grow overflow-y-auto max-h-[750px] pr-2 custom-scrollbar">
+          <DndContext 
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext 
+              items={blocks.map(b => b.id)}
+              strategy={rectSortingStrategy}
             >
-              <div className="flex gap-4">
-                <div className="w-8 shrink-0 flex flex-col items-center gap-2">
-                   <GripVertical className="w-5 h-5 text-stone-300 group-hover:text-stone-400 cursor-grab active:cursor-grabbing" />
-                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black ${block.type === 'question' ? 'bg-emerald-100 text-emerald-600' : 'bg-stone-100 text-stone-400'}`}>
-                      {block.type === 'text' && <Type className="w-4 h-4" />}
-                      {block.type === 'image' && <ImageIcon className="w-4 h-4" />}
-                      {block.type === 'question' && <HelpCircle className="w-4 h-4" />}
-                   </div>
-                </div>
-
-                <div className="flex-grow">
-                   {block.type === 'text' && (
-                     <div className="p-2">
-                        {block.content ? (
-                          <div className="text-stone-700 leading-relaxed"><MathText text={block.content} /></div>
-                        ) : (
-                          <span className="text-stone-300 italic">Пустой текстовый блок...</span>
-                        )}
-                     </div>
-                   )}
-
-                   {block.type === 'image' && (
-                     <div className="relative aspect-video bg-stone-50 rounded-2xl border-2 border-dashed border-stone-200 flex flex-col items-center justify-center text-stone-300 overflow-hidden">
-                       {block.imageUrl ? (
-                         <img src={block.imageUrl} alt="Preview" className="w-full h-full object-cover" />
-                       ) : (
-                         <>
-                           <ImageIcon className="w-10 h-10 mb-2 opacity-50" />
-                           <span className="text-xs font-bold uppercase tracking-widest text-stone-400">Нет изображения</span>
-                         </>
-                       )}
-                     </div>
-                   )}
-
-                   {block.type === 'question' && (
-                     <div className="p-2 space-y-4">
-                        <div className="font-serif font-black text-stone-900 border-b border-stone-100 pb-2 flex items-center justify-between">
-                           <span>Вопрос</span>
-                           {block.questionData?.ru ? (
-                             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                           ) : (
-                             <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
-                           )}
-                        </div>
-                        <p className="text-stone-600 line-clamp-2 italic">
-                          {block.questionData?.ru || 'Текст вопроса не заполнен...'}
-                        </p>
-                     </div>
-                   )}
-                </div>
-
-                <button 
-                  onClick={(e) => { e.stopPropagation(); removeBlock(block.id); }}
-                  className="opacity-0 group-hover:opacity-100 p-2 text-stone-300 hover:text-rose-500 transition-all bg-stone-50 rounded-xl"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+              <div className="flex flex-wrap gap-4">
+                {blocks.map((block) => (
+                  <SortableBlock 
+                    key={block.id}
+                    block={block}
+                    isSelected={selectedBlockId === block.id}
+                    onSelect={setSelectedBlockId}
+                    onRemove={removeBlock}
+                  />
+                ))}
               </div>
-            </Reorder.Item>
-          ))}
-        </Reorder.Group>
+            </SortableContext>
+          </DndContext>
 
         {blocks.length === 0 && (
           <div className="py-32 flex flex-col items-center justify-center bg-white rounded-[3rem] border-4 border-dashed border-stone-100 text-stone-200">
@@ -320,21 +424,46 @@ export default function VisualTestEditor({ initialBlocks = [], onSave }: VisualT
                 </div>
               )}
 
-              <div className="pt-8 border-t border-stone-100 flex items-center justify-start">
-                 <div className="flex gap-2">
-                   <button 
-                    onClick={() => updateBlock(selectedBlock.id, { layout: 'third' })}
-                    className={`p-2 rounded-lg border ${selectedBlock.layout === 'third' ? 'bg-stone-900 border-stone-900 text-white' : 'bg-white border-stone-200 text-stone-400'}`}
-                   >
-                     <Minimize2 className="w-4 h-4 shrink-0" />
-                   </button>
-                   <button 
-                    onClick={() => updateBlock(selectedBlock.id, { layout: 'full' })}
-                    className={`p-2 rounded-lg border ${selectedBlock.layout === 'full' ? 'bg-stone-900 border-stone-900 text-white' : 'bg-white border-stone-200 text-stone-400'}`}
-                   >
-                     <Maximize2 className="w-4 h-4 shrink-0" />
-                   </button>
+              <div className="pt-8 border-t border-stone-100 flex flex-col gap-6">
+                 <div className="space-y-4">
+                   <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Размер блока</label>
+                   <div className="flex gap-2">
+                     {[
+                       { id: 'third', icon: Minimize2, label: '1/3' },
+                       { id: 'half', icon: Columns2, label: '1/2' },
+                       { id: 'full', icon: Maximize2, label: '1/1' }
+                     ].map((opt) => (
+                       <button 
+                        key={opt.id}
+                        onClick={() => updateBlock(selectedBlock.id, { layout: opt.id as any })}
+                        className={`flex-grow flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all ${selectedBlock.layout === opt.id ? 'bg-stone-900 border-stone-900 text-white' : 'bg-white border-stone-200 text-stone-400 hover:border-emerald-600 hover:text-emerald-600'}`}
+                       >
+                         <opt.icon className="w-4 h-4" />
+                         <span className="text-[10px] font-black">{opt.label}</span>
+                       </button>
+                     ))}
+                   </div>
                  </div>
+
+                 {(selectedBlock.type === 'text' || selectedBlock.type === 'image') && (
+                   <div className="space-y-4">
+                     <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Колонки контента</label>
+                     <div className="flex gap-2">
+                       {[1, 2, 3].map((num) => (
+                         <button 
+                          key={num}
+                          onClick={() => updateBlock(selectedBlock.id, { columnCount: num as any })}
+                          className={`flex-grow flex items-center justify-center gap-2 py-3 rounded-2xl border transition-all ${selectedBlock.columnCount === num || (!selectedBlock.columnCount && num === 1) ? 'bg-stone-900 border-stone-900 text-white' : 'bg-white border-stone-200 text-stone-400 hover:border-emerald-600 hover:text-emerald-600'}`}
+                         >
+                           {num === 1 && <Maximize2 className="w-4 h-4" />}
+                           {num === 2 && <Columns2 className="w-4 h-4" />}
+                           {num === 3 && <Columns3 className="w-4 h-4" />}
+                           <span className="text-xs font-black">{num}</span>
+                         </button>
+                       ))}
+                     </div>
+                   </div>
+                 )}
               </div>
             </div>
           ) : (

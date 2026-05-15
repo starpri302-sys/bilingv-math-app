@@ -11,7 +11,8 @@ import {
   FileText,
   MessageSquare,
   Send,
-  CheckCircle2
+  CheckCircle2,
+  Trash2
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../store/authContext';
@@ -59,11 +60,20 @@ interface Comment {
   created_at: string;
 }
 
+interface Resource {
+  id: string;
+  lecture_id: string;
+  title: string;
+  type: 'pdf' | 'link' | 'video' | 'file';
+  url: string;
+}
+
 export default function LectureDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [lecture, setLecture] = useState<Lecture | null>(null);
   const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [lang, setLang] = useState<'ru' | 'tyv'>('ru');
   const [visualBlocks, setVisualBlocks] = useState<VisualBlock[]>([]);
@@ -103,6 +113,15 @@ export default function LectureDetail() {
     }
   };
 
+  const fetchResources = async () => {
+    try {
+      const data = await api.getLectureResources(id!);
+      setResources(data);
+    } catch (err) {
+      console.error('Failed to fetch resources:', err);
+    }
+  };
+
   useEffect(() => {
     const fetchLecture = async () => {
       try {
@@ -116,6 +135,7 @@ export default function LectureDetail() {
         fetchComments();
         fetchQuiz();
         fetchProgress();
+        fetchResources();
       } catch (err: any) {
         if (err.message.includes('Pro subscription required')) {
           setIsProNeeded(true);
@@ -142,6 +162,16 @@ export default function LectureDetail() {
       console.error('Failed to post comment:', err);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!window.confirm('Вы уверены, что хотите удалить этот комментарий?')) return;
+    try {
+      await api.deleteLectureComment(id!, commentId);
+      fetchComments();
+    } catch (err) {
+      console.error('Failed to delete comment:', err);
     }
   };
 
@@ -289,6 +319,35 @@ export default function LectureDetail() {
             )}
           </div>
 
+          {/* Resources Section */}
+          {resources.length > 0 && (
+            <div className="px-8 sm:px-12 pb-12">
+               <h3 className="text-xs font-black text-stone-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                 <FileText className="w-4 h-4" />
+                 Дополнительные материалы
+               </h3>
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {resources.map((res) => (
+                    <a 
+                      key={res.id}
+                      href={res.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-4 p-4 bg-stone-50 rounded-2xl border border-stone-100 hover:border-emerald-600 hover:bg-emerald-50 transition-all group"
+                    >
+                       <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-stone-400 group-hover:text-emerald-600 shadow-sm border border-stone-100">
+                          {res.type === 'pdf' ? <FileText className="w-5 h-5" /> : <div className="w-2 h-2 bg-emerald-500 rounded-full" />}
+                       </div>
+                       <div className="flex-grow min-w-0">
+                          <p className="text-xs font-bold text-stone-900 truncate">{res.title}</p>
+                          <p className="text-[10px] text-stone-400 uppercase tracking-widest">{res.type}</p>
+                       </div>
+                    </a>
+                  ))}
+               </div>
+            </div>
+          )}
+
           <div className="bg-stone-50/50 border-t border-stone-100 p-8 sm:p-12">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="p-6 bg-white border border-stone-200 rounded-3xl shadow-sm">
@@ -388,10 +447,21 @@ export default function LectureDetail() {
                 <div className="flex-grow space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-bold text-stone-900">{comment.username}</span>
-                    <span className="text-[10px] text-stone-400 font-bold uppercase tracking-widest flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {new Date(comment.created_at).toLocaleDateString()}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] text-stone-400 font-bold uppercase tracking-widest flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {new Date(comment.created_at).toLocaleDateString()}
+                      </span>
+                      {(user?.id === comment.user_id || profile?.role === 'super_admin' || profile?.role === 'chief_editor') && (
+                        <button 
+                          onClick={() => handleDeleteComment(comment.id)}
+                          className="text-stone-300 hover:text-rose-500 transition-colors p-1"
+                          title="Удалить"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="text-stone-600 leading-relaxed text-sm">
                     <MathText text={comment.content} />

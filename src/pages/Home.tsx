@@ -4,9 +4,12 @@ import TermCard from '../components/TermCard';
 import SearchBar from '../components/SearchBar';
 import SEO from '../components/SEO';
 import BilingualEditor from '../components/BilingualEditor';
+import Pagination from '../components/Pagination';
 import { useAuth } from '../store/authContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { Languages, Info, Plus } from 'lucide-react';
+
+const TERMS_PER_PAGE = 12;
 
 export default function Home() {
   const { user, isAdmin, isEditor, isGuest } = useAuth();
@@ -16,6 +19,7 @@ export default function Home() {
   const [language, setLanguage] = useState<string>('ru');
   const [loading, setLoading] = useState(true);
   const [showEditor, setShowEditor] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     fetchLanguages();
@@ -42,6 +46,7 @@ export default function Home() {
 
   const fetchTerms = async (filters?: any) => {
     setLoading(true);
+    setCurrentPage(1);
     try {
       const data = await api.getTerms({ status: 'published', ...filters });
       if (Array.isArray(data)) {
@@ -62,6 +67,7 @@ export default function Home() {
   };
 
   const handleSearch = (query: string, mode: 'basic' | 'advanced') => {
+    setCurrentPage(1);
     if (!query.trim()) {
       setFilteredTerms(terms);
       return;
@@ -83,6 +89,12 @@ export default function Home() {
     fetchTerms(filters);
   };
 
+  const totalPages = Math.ceil(filteredTerms.length / TERMS_PER_PAGE);
+  const currentTerms = filteredTerms.slice(
+    (currentPage - 1) * TERMS_PER_PAGE,
+    currentPage * TERMS_PER_PAGE
+  );
+
   return (
     <div className="space-y-12">
       <SEO />
@@ -101,7 +113,7 @@ export default function Home() {
           {languages.map((lang) => (
             <button
               key={lang.code}
-              onClick={() => setLanguage(lang.code)}
+              onClick={() => { setLanguage(lang.code); setCurrentPage(1); }}
               className={`px-6 py-2 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${language === lang.code ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
             >
               {lang.name}
@@ -126,14 +138,24 @@ export default function Home() {
         <div className="flex justify-center items-center py-20">
           <div className="w-12 h-12 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin"></div>
         </div>
-      ) : filteredTerms.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          <AnimatePresence mode="popLayout">
-            {filteredTerms.map((term) => (
-              <TermCard key={term.id} term={term} language={language} />
-            ))}
-          </AnimatePresence>
-        </div>
+      ) : currentTerms.length > 0 ? (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <AnimatePresence mode="popLayout">
+              {currentTerms.map((term) => (
+                <TermCard key={term.id} term={term} language={language} />
+              ))}
+            </AnimatePresence>
+          </div>
+          <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(page) => {
+              setCurrentPage(page);
+              window.scrollTo({ top: 400, behavior: 'smooth' });
+            }}
+          />
+        </>
       ) : (
         <div className="text-center py-20 space-y-4 bg-white rounded-3xl border border-stone-100 shadow-sm">
           <Info className="w-12 h-12 text-stone-300 mx-auto" />

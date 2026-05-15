@@ -580,10 +580,38 @@ async function startServer() {
 
   app.get("/api/lectures/:id/comments", async (req, res) => {
     try {
-      const commentsRes = await pool.query("SELECT * FROM lecture_comments WHERE lecture_id = $1 ORDER BY created_at ASC", [req.params.id]);
+      const commentsRes = await pool.query(`
+        SELECT c.*, u.username, u.avatar 
+        FROM lecture_comments c 
+        JOIN users u ON c.user_id = u.id 
+        WHERE c.lecture_id = $1 
+        ORDER BY c.created_at ASC
+      `, [req.params.id]);
       res.json(commentsRes.rows);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch lecture comments" });
+    }
+  });
+
+  app.delete("/api/lectures/:lectureId/comments/:commentId", authenticateToken, async (req, res) => {
+    try {
+      const commentRes = await pool.query("SELECT user_id FROM lecture_comments WHERE id = $1", [req.params.commentId]);
+      if (commentRes.rows.length === 0) {
+        return res.status(404).json({ error: "Comment not found" });
+      }
+
+      const comment = commentRes.rows[0];
+      const isOwner = comment.user_id === (req as any).user.id;
+      const isAdmin = (req as any).user.role === 'super_admin' || (req as any).user.role === 'chief_editor';
+
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      await pool.query("DELETE FROM lecture_comments WHERE id = $1", [req.params.commentId]);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete comment" });
     }
   });
 
@@ -863,6 +891,159 @@ async function startServer() {
     }
   });
 
+  app.post("/api/lectures/:id/resources/batch", authenticateToken, requirePro, async (req, res) => {
+    const { resources } = req.body;
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      // For simplicity, we replace all resources for the lecture
+      await client.query("DELETE FROM lecture_resources WHERE lecture_id = $1", [req.params.id]);
+      for (const res of resources) {
+        const id = Math.random().toString(36).substr(2, 9);
+        await client.query(
+          "INSERT INTO lecture_resources (id, lecture_id, title, type, url) VALUES ($1, $2, $3, $4, $5)",
+          [id, req.params.id, res.title, res.type, res.url]
+        );
+      }
+      await client.query("COMMIT");
+      res.json({ success: true });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      res.status(500).json({ error: "Failed to save resources batch" });
+    } finally {
+      client.release();
+    }
+  });
+
+  // +++ CLASSES & ENROLLMENT API +++
+  app.get("/api/classes", authenticateToken, async (req, res) => {
+    try {
+      const classesRes = await pool.query("SELECT * FROM classes WHERE teacher_id = $1 ORDER BY created_at DESC", [(req as any).user.id]);
+      res.json(classesRes.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch classes" });
+    }
+  });
+
+  app.post("/api/classes", authenticateToken, requirePro, async (req, res) => {
+    const { name, grade } = req.body;
+    const id = Math.random().toString(36).substr(2, 9);
+    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    try {
+      await pool.query(
+        "INSERT INTO classes (id, teacher_id, name, grade, invite_code) VALUES ($1, $2, $3, $4, $5)",
+        [id, (req as any).user.id, name, grade, inviteCode]
+      );
+      res.json({ id, inviteCode, success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create class" });
+    }
+  });
+
+  app.post("/api/classes/join", authenticateToken, async (req, res) => {
+    const { inviteCode } = req.body;
+    try {
+      const classRes = await pool.query("SELECT id FROM classes WHERE invite_code = $1", [inviteCode.toUpperCase()]);
+      const cls = classRes.rows[0];
+      if (!cls) return res.status(404).json({ error: "Класс с таким кодом не найден." });
+
+      const enrollmentId = Math.random().toString(36).substr(2, 9);
+      await pool.query(
+        "INSERT INTO class_enrollments (id, class_id, user_id) VALUES ($1, $2, $3) ON CONFLICT (class_id, user_id) DO NOTHING",
+        [enrollmentId, cls.id, (req as any).user.id]
+      );
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to join class" });
+    }
+  });
+
+  app.get("/api/classes/:id/students", authenticateToken, async (req, res) => {
+    try {
+      const studentsRes = await pool.query(`
+        SELECT u.id, u.username, u.full_name, u.avatar, u.grade, ce.enrolled_at
+        FROM class_enrollments ce
+        JOIN users u ON ce.user_id = u.id
+        WHERE ce.class_id = $1
+        ORDER BY ce.enrolled_at DESC
+      `, [req.params.id]);
+      res.json(studentsRes.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch students" });
+    }
+  });
+
+  // +++ ASSIGNMENTS API +++
+  app.get("/api/classes/:id/assignments", authenticateToken, async (req, res) => {
+    try {
+      const assignmentsRes = await pool.query(`
+        SELECT a.*, l.title_ru as lecture_title_ru, l.course_id
+        FROM assignments a
+        JOIN lectures l ON a.lecture_id = l.id
+        WHERE a.class_id = $1
+        ORDER BY a.due_date ASC
+      `, [req.params.id]);
+      res.json(assignmentsRes.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch assignments" });
+    }
+  });
+
+  app.post("/api/classes/:id/assignments", authenticateToken, requirePro, async (req, res) => {
+    const { lecture_id, due_date } = req.body;
+    const id = Math.random().toString(36).substr(2, 9);
+    try {
+      await pool.query(
+        "INSERT INTO assignments (id, class_id, lecture_id, due_date) VALUES ($1, $2, $3, $4)",
+        [id, req.params.id, lecture_id, due_date]
+      );
+      res.json({ id, success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create assignment" });
+    }
+  });
+
+  // +++ TEACHER DASHBOARD API +++
+  app.get("/api/teacher/dashboard", authenticateToken, requirePro, async (req, res) => {
+    try {
+      const userId = (req as any).user.id;
+      const [courses, classes, latestCompletions] = await Promise.all([
+        pool.query("SELECT * FROM courses WHERE created_by = $1 ORDER BY created_at DESC", [userId]),
+        pool.query("SELECT * FROM classes WHERE teacher_id = $1 ORDER BY created_at DESC", [userId]),
+        pool.query(`
+          SELECT lc.*, u.username, l.title_ru as lecture_title, c.title_ru as course_title
+          FROM lecture_completions lc
+          JOIN users u ON lc.user_id = u.id
+          JOIN lectures l ON lc.lecture_id = l.id
+          JOIN courses c ON l.course_id = c.id
+          WHERE c.created_by = $1
+          ORDER BY lc.completed_at DESC
+          LIMIT 10
+        `, [userId])
+      ]);
+      res.json({
+        courses: courses.rows,
+        classes: classes.rows,
+        latestCompletions: latestCompletions.rows
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch teacher dashboard" });
+    }
+  });
+
+  // +++ LECTURE RESOURCES API +++
+  app.get("/api/lectures/:id/resources", async (req, res) => {
+    try {
+      const resourcesRes = await pool.query(
+        "SELECT * FROM lecture_resources WHERE lecture_id = $1 ORDER BY created_at ASC",
+        [req.params.id]
+      );
+      res.json(resourcesRes.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch resources" });
+    }
+  });
+
   app.post("/api/lectures/:id/resources", authenticateToken, requirePro, async (req, res) => {
     const { title, url, type } = req.body;
     const id = Math.random().toString(36).substr(2, 9);
@@ -956,6 +1137,23 @@ async function startServer() {
     }
   });
 
+  app.get("/api/classes/:id/progress", authenticateToken, requirePro, async (req, res) => {
+    try {
+      const progressRes = await pool.query(`
+        SELECT lc.*, u.username, u.full_name, l.title_ru as lecture_title
+        FROM lecture_completions lc
+        JOIN users u ON lc.user_id = u.id
+        JOIN lectures l ON lc.lecture_id = l.id
+        JOIN class_enrollments ce ON u.id = ce.user_id
+        WHERE ce.class_id = $1
+        ORDER BY lc.completed_at DESC
+      `, [req.params.id]);
+      res.json(progressRes.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch class progress" });
+    }
+  });
+
   // +++ ASSIGNMENTS API +++
   app.get("/api/classes/:id/assignments", authenticateToken, async (req, res) => {
     try {
@@ -1002,10 +1200,23 @@ async function startServer() {
         WHERE c.teacher_id = $1
       `, [teacherId]);
 
+      const activityRes = await pool.query(`
+        SELECT lc.*, u.username, u.full_name, l.title_ru as lecture_title
+        FROM lecture_completions lc
+        JOIN users u ON lc.user_id = u.id
+        JOIN lectures l ON lc.lecture_id = l.id
+        JOIN class_enrollments ce ON u.id = ce.user_id
+        JOIN classes c ON ce.class_id = c.id
+        WHERE c.teacher_id = $1
+        ORDER BY lc.completed_at DESC
+        LIMIT 10
+      `, [teacherId]);
+
       res.json({
         courses: coursesRes.rows,
         classes: classesRes.rows,
-        stats: statsRes.rows[0]
+        stats: statsRes.rows[0],
+        recent_activity: activityRes.rows
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch dashboard" });

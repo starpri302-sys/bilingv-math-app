@@ -19,6 +19,7 @@ import TermsOfService from './pages/TermsOfService';
 import Courses from './pages/Courses';
 import LectureDetail from './pages/LectureDetail';
 import TeacherDashboard from './pages/TeacherDashboard';
+import ClassDetail from './pages/ClassDetail';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 
@@ -47,6 +48,7 @@ export default function App() {
               <Route path="/courses/:id" element={<Courses />} />
               <Route path="/lectures/:id" element={<LectureDetail />} />
               <Route path="/teacher" element={<TeacherDashboard />} />
+              <Route path="/teacher/classes/:id" element={<ClassDetail />} />
             </Routes>
           </main>
           <Footer />

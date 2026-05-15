@@ -275,6 +275,13 @@ export const api = {
     });
     return handleResponse(res);
   },
+  async deleteLectureComment(lectureId: string, commentId: string) {
+    const res = await fetch(`/api/lectures/${lectureId}/comments/${commentId}`, {
+      method: 'DELETE',
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
   async getLectureQuiz(lectureId: string) {
     const res = await fetch(`/api/lectures/${lectureId}/quiz`);
     return handleResponse(res);
@@ -401,6 +408,14 @@ export const api = {
     });
     return handleResponse(res);
   },
+  async saveLectureResources(lectureId: string, resources: any[]) {
+    const res = await fetch(`/api/lectures/${lectureId}/resources/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify({ resources })
+    });
+    return handleResponse(res);
+  },
   // +++ CLASSES & ENROLLMENT API +++
   async getClasses() {
     const res = await fetch('/api/classes', {
@@ -426,6 +441,12 @@ export const api = {
   },
   async getClassStudents(classId: string) {
     const res = await fetch(`/api/classes/${classId}/students`, {
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
+  async getClassProgress(classId: string) {
+    const res = await fetch(`/api/classes/${classId}/progress`, {
       headers: getAuthHeader()
     });
     return handleResponse(res);

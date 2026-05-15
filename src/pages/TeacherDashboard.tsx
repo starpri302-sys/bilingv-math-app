@@ -10,6 +10,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../store/authContext';
 import SEO from '../components/SEO';
+import Pagination from '../components/Pagination';
+
+const ITEMS_PER_PAGE = 6;
 
 interface DashboardData {
   courses: any[];
@@ -18,6 +21,7 @@ interface DashboardData {
     total_students: number;
     total_assignments: number;
   };
+  recent_activity: any[];
 }
 
 export default function TeacherDashboard() {
@@ -29,6 +33,8 @@ export default function TeacherDashboard() {
   const [showCreateClass, setShowCreateClass] = useState(false);
   const [newClassName, setNewClassName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [coursesPage, setCoursesPage] = useState(1);
+  const [classesPage, setClassesPage] = useState(1);
 
   useEffect(() => {
     if (!isTeacher && !isPro) {
@@ -84,9 +90,9 @@ export default function TeacherDashboard() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-serif font-black text-stone-900 mb-2">
-            Салам, {user?.full_name?.split(' ')[0] || user?.username}! 👋
+            Здравствуйте, {user?.full_name || user?.username}!
           </h1>
-          <p className="text-stone-500 font-medium">Добро пожаловать в ваш персональный образовательный хаб.</p>
+          <p className="text-stone-500 font-medium">Добро пожаловать в личный кабинет преподавателя.</p>
         </div>
         <div className="flex items-center gap-3">
           <button 
@@ -168,15 +174,34 @@ export default function TeacherDashboard() {
                  </div>
                  
                  <div className="space-y-6">
-                    {/* Placeholder for real activity when backend is updated to return logs */}
-                    <div className="flex gap-4 items-start">
-                      <div className="w-10 h-10 bg-stone-50 rounded-xl flex items-center justify-center text-stone-400 border border-stone-100">
-                        <Clock className="w-5 h-5" />
+                    {data?.recent_activity && data.recent_activity.length > 0 ? (
+                      data.recent_activity.map((activity: any) => (
+                        <div key={activity.id} className="flex gap-4 items-start group">
+                          <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                            <CheckCircle2 className="w-5 h-5" />
+                          </div>
+                          <div className="flex-grow">
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-sm font-bold text-stone-900">{activity.full_name || activity.username}</p>
+                              <span className="text-[10px] font-black text-stone-300 uppercase tracking-widest">{new Date(activity.completed_at).toLocaleDateString()}</span>
+                            </div>
+                            <p className="text-xs text-stone-500">
+                              Изучил лекцию <span className="font-bold text-stone-700">«{activity.lecture_title}»</span>
+                              {activity.max_score > 0 && ` с результатом ${activity.score}/${activity.max_score}`}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="flex gap-4 items-start">
+                        <div className="w-10 h-10 bg-stone-50 rounded-xl flex items-center justify-center text-stone-400 border border-stone-100">
+                          <Clock className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-stone-600 text-sm">Пока нет уведомлений об активности учеников.</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-stone-600 text-sm">Пока нет уведомлений об активности учеников.</p>
-                      </div>
-                    </div>
+                    )}
                  </div>
                </div>
 
@@ -208,7 +233,7 @@ export default function TeacherDashboard() {
 
           {activeTab === 'courses' && (
             <div className="space-y-4">
-               {data?.courses.map((course, idx) => (
+               {data?.courses?.slice((coursesPage - 1) * ITEMS_PER_PAGE, coursesPage * ITEMS_PER_PAGE).map((course, idx) => (
                  <Link 
                   key={course.id} 
                   to={`/courses/${course.id}`}
@@ -228,6 +253,13 @@ export default function TeacherDashboard() {
                    </div>
                  </Link>
                ))}
+               {data?.courses && data.courses.length > ITEMS_PER_PAGE && (
+                  <Pagination 
+                    currentPage={coursesPage}
+                    totalPages={Math.ceil(data.courses.length / ITEMS_PER_PAGE)}
+                    onPageChange={setCoursesPage}
+                  />
+               )}
                {data?.courses.length === 0 && (
                  <div className="text-center py-20 bg-white rounded-[2rem] border border-dashed border-stone-200 text-stone-400">
                     Начните с создания вашего первого курса
@@ -237,8 +269,9 @@ export default function TeacherDashboard() {
           )}
 
           {activeTab === 'classes' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               {data?.classes.map((cls) => (
+            <div className="space-y-8">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {data?.classes?.slice((classesPage - 1) * ITEMS_PER_PAGE, classesPage * ITEMS_PER_PAGE).map((cls) => (
                  <div key={cls.id} className="bg-white p-8 rounded-[2rem] border border-stone-200 shadow-sm hover:shadow-md transition-all">
                     <div className="flex items-center justify-between mb-6">
                       <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
@@ -258,6 +291,14 @@ export default function TeacherDashboard() {
                     </div>
                  </div>
                ))}
+               </div>
+               {data?.classes && data.classes.length > ITEMS_PER_PAGE && (
+                  <Pagination 
+                    currentPage={classesPage}
+                    totalPages={Math.ceil(data.classes.length / ITEMS_PER_PAGE)}
+                    onPageChange={setClassesPage}
+                  />
+               )}
                {data?.classes.length === 0 && (
                  <div className="md:col-span-2 text-center py-20 bg-white rounded-[2rem] border border-dashed border-stone-200 text-stone-400">
                     У вас пока нет активных классов

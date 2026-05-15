@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Layout, Eye, Edit3, Send, ChevronRight, Info, AlertCircle, Plus, Trash2, CheckCircle2, HelpCircle } from 'lucide-react';
+import { Layout, Eye, Edit3, Send, ChevronRight, Info, AlertCircle, Plus, Trash2, CheckCircle2, HelpCircle, FileText } from 'lucide-react';
 import MathText from './MathText';
 
 interface QuizOption {
@@ -15,6 +15,12 @@ interface QuizQuestion {
   options: QuizOption[];
 }
 
+interface Resource {
+  title: string;
+  type: 'pdf' | 'link' | 'video' | 'file';
+  url: string;
+}
+
 interface EditorProps {
   initialTitleRu?: string;
   initialTitleTyv?: string;
@@ -22,13 +28,15 @@ interface EditorProps {
   initialContentTyv?: string;
   initialIsFree?: boolean;
   initialQuiz?: { questions: QuizQuestion[] } | null;
+  initialResources?: Resource[];
   onSave: (data: { 
     title_ru: string; 
     title_tyv: string; 
     content_ru: string; 
     content_tyv: string; 
     is_free: boolean;
-    quiz?: { questions: QuizQuestion[] }
+    quiz?: { questions: QuizQuestion[] };
+    resources?: Resource[];
   }) => Promise<void>;
   isSubmitting?: boolean;
 }
@@ -40,6 +48,7 @@ export default function LectureEditor({
   initialContentTyv = '', 
   initialIsFree = true,
   initialQuiz = null,
+  initialResources = [],
   onSave, 
   isSubmitting = false 
 }: EditorProps) {
@@ -48,9 +57,10 @@ export default function LectureEditor({
   const [contentRu, setContentRu] = useState(initialContentRu);
   const [contentTyv, setContentTyv] = useState(initialContentTyv);
   const [isFree, setIsFree] = useState(initialIsFree);
-  const [activeTab, setActiveTab] = useState<'edit' | 'preview' | 'quiz'>('edit');
+  const [activeTab, setActiveTab] = useState<'edit' | 'preview' | 'quiz' | 'resources'>('edit');
   const [lang, setLang] = useState<'ru' | 'tyv'>('ru');
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(initialQuiz?.questions || []);
+  const [resources, setResources] = useState<Resource[]>(initialResources);
   const [splitWidth, setSplitWidth] = useState(50); // percentage for editor area
   const [isResizing, setIsResizing] = useState(false);
 
@@ -98,7 +108,8 @@ export default function LectureEditor({
       content_ru: contentRu,
       content_tyv: contentTyv,
       is_free: isFree,
-      quiz: quizQuestions.length > 0 ? { questions: quizQuestions } : undefined
+      quiz: quizQuestions.length > 0 ? { questions: quizQuestions } : undefined,
+      resources: resources.length > 0 ? resources : undefined
     });
   };
 
@@ -130,7 +141,6 @@ export default function LectureEditor({
     const newOptions = [...newQuestions[qIdx].options];
     
     if (field === 'is_correct' && value === true) {
-      // Ensure only one correct option for now as per user request (though UI could support multiple)
       newOptions.forEach((opt, i) => opt.is_correct = (i === oIdx));
     } else {
       newOptions[oIdx] = { ...newOptions[oIdx], [field]: value };
@@ -138,6 +148,20 @@ export default function LectureEditor({
     
     newQuestions[qIdx].options = newOptions;
     setQuizQuestions(newQuestions);
+  };
+
+  const addResource = () => {
+    setResources([...resources, { title: '', type: 'pdf', url: '' }]);
+  };
+
+  const updateResource = (idx: number, field: keyof Resource, value: any) => {
+    const newResources = [...resources];
+    newResources[idx] = { ...newResources[idx], [field]: value };
+    setResources(newResources);
+  };
+
+  const removeResource = (idx: number) => {
+    setResources(resources.filter((_, i) => i !== idx));
   };
 
   return (
@@ -174,6 +198,13 @@ export default function LectureEditor({
           >
             <HelpCircle className="w-4 h-4" />
             Тест/Квиз
+          </button>
+          <button
+            onClick={() => setActiveTab('resources')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'resources' ? 'bg-blue-600 text-white shadow-md' : 'text-stone-500 hover:text-stone-700'}`}
+          >
+            <FileText className="w-4 h-4" />
+            Ресурсы
           </button>
         </div>
 
@@ -224,7 +255,72 @@ export default function LectureEditor({
             style={{ width: activeTab === 'edit' && window.innerWidth >= 768 ? `${splitWidth}%` : '100%' }}
             className={`flex flex-col min-h-0 bg-stone-50 ${activeTab === 'preview' ? 'hidden md:flex' : 'flex'} ${activeTab === 'quiz' ? 'md:w-full' : ''}`}
           >
-            {activeTab === 'quiz' ? (
+            {activeTab === 'resources' ? (
+              <div className="flex-grow p-6 sm:p-8 space-y-8 overflow-y-auto">
+                 <div className="flex items-center justify-between">
+                    <div>
+                       <h3 className="text-xl font-serif font-black text-stone-900">Дополнительные ресурсы</h3>
+                       <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mt-1">Прикрепите файлы или ссылки к лекции</p>
+                    </div>
+                    <button 
+                      onClick={addResource}
+                      className="flex items-center gap-2 bg-blue-50 text-blue-600 px-4 py-2 rounded-xl font-bold hover:bg-blue-100 transition-all text-xs"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Добавить ресурс
+                    </button>
+                 </div>
+
+                 <div className="space-y-4">
+                    {resources.map((res, idx) => (
+                      <div key={idx} className="bg-white border border-stone-200 rounded-[1.5rem] p-6 flex flex-wrap items-end gap-4 shadow-sm">
+                         <div className="flex-grow min-w-[200px] space-y-1">
+                            <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Заголовок</label>
+                            <input 
+                              value={res.title}
+                              onChange={(e) => updateResource(idx, 'title', e.target.value)}
+                              placeholder="Напр: Сборник задач"
+                              className="w-full bg-stone-50 border border-stone-200 rounded-xl py-3 px-4 outline-none focus:border-blue-500"
+                            />
+                         </div>
+                         <div className="w-32 space-y-1">
+                            <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Тип</label>
+                            <select 
+                              value={res.type}
+                              onChange={(e) => updateResource(idx, 'type', e.target.value)}
+                              className="w-full bg-stone-50 border border-stone-200 rounded-xl py-3 px-4 outline-none focus:border-blue-500 appearance-none"
+                            >
+                               <option value="pdf">PDF</option>
+                               <option value="link">Ссылка</option>
+                               <option value="file">Файл</option>
+                               <option value="video">Видео</option>
+                            </select>
+                         </div>
+                         <div className="flex-grow min-w-[200px] space-y-1">
+                            <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">URL</label>
+                            <input 
+                              value={res.url}
+                              onChange={(e) => updateResource(idx, 'url', e.target.value)}
+                              placeholder="https://..."
+                              className="w-full bg-stone-50 border border-stone-200 rounded-xl py-3 px-4 outline-none focus:border-blue-500"
+                            />
+                         </div>
+                         <button 
+                           onClick={() => removeResource(idx)}
+                           className="p-3 text-stone-400 hover:text-rose-600 mb-0.5"
+                         >
+                            <Trash2 className="w-5 h-5" />
+                         </button>
+                      </div>
+                    ))}
+                    {resources.length === 0 && (
+                      <div className="text-center py-20 bg-stone-50/50 rounded-[3rem] border border-dashed border-stone-200">
+                         <p className="text-stone-400 font-bold uppercase tracking-widest text-xs">Нет прикрепленных ресурсов</p>
+                      </div>
+                    )}
+                 </div>
+              </div>
+            ) : activeTab === 'quiz' ? (
               <div className="flex-grow p-6 sm:p-8 space-y-8 overflow-y-auto">
                  <div className="flex items-center justify-between">
                     <div>
