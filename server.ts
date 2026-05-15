@@ -162,8 +162,6 @@ async function initDb(forceReinstall = false) {
     // ... (keep existing users logic) ...
 
     await client.exec(`
-      -- ... (existing tables) ...
-
       CREATE TABLE IF NOT EXISTS courses (
         id TEXT PRIMARY KEY,
         subject_id TEXT REFERENCES subjects(id),
@@ -175,15 +173,35 @@ async function initDb(forceReinstall = false) {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS course_modules (
+        id TEXT PRIMARY KEY,
+        course_id TEXT REFERENCES courses(id) ON DELETE CASCADE,
+        title_ru TEXT,
+        title_tyv TEXT,
+        order_index INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE TABLE IF NOT EXISTS lectures (
         id TEXT PRIMARY KEY,
         course_id TEXT REFERENCES courses(id) ON DELETE CASCADE,
+        module_id TEXT REFERENCES course_modules(id) ON DELETE SET NULL,
         title_ru TEXT,
         title_tyv TEXT,
         content_ru TEXT,
         content_tyv TEXT,
         order_index INTEGER,
         is_free INTEGER DEFAULT 0,
+        item_type TEXT DEFAULT 'theory',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS lecture_resources (
+        id TEXT PRIMARY KEY,
+        lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
+        title TEXT,
+        url TEXT,
+        type TEXT, -- 'pdf', 'ppt', 'link', etc.
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -207,6 +225,40 @@ async function initDb(forceReinstall = false) {
         UNIQUE(user_id, lecture_id)
       );
 
+      CREATE TABLE IF NOT EXISTS classes (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        teacher_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        invite_code TEXT UNIQUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS class_enrollments (
+        class_id TEXT REFERENCES classes(id) ON DELETE CASCADE,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY(class_id, user_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS assignments (
+        id TEXT PRIMARY KEY,
+        class_id TEXT REFERENCES classes(id) ON DELETE CASCADE,
+        lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
+        due_date TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS assignment_submissions (
+        id TEXT PRIMARY KEY,
+        assignment_id TEXT REFERENCES assignments(id) ON DELETE CASCADE,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        score INTEGER,
+        max_score INTEGER,
+        status TEXT DEFAULT 'submitted', -- 'submitted', 'graded'
+        submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(assignment_id, user_id)
+      );
+
       CREATE TABLE IF NOT EXISTS lecture_quizzes (
         id TEXT PRIMARY KEY,
         lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
@@ -214,7 +266,9 @@ async function initDb(forceReinstall = false) {
         title_tyv TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `);
 
+    await client.exec(`
       CREATE TABLE IF NOT EXISTS quiz_questions (
         id TEXT PRIMARY KEY,
         quiz_id TEXT REFERENCES lecture_quizzes(id) ON DELETE CASCADE,
@@ -744,6 +798,217 @@ async function startServer() {
       res.status(500).json({ error: "Failed to save quiz" });
     } finally {
       client.release();
+    }
+  });
+
+  // +++ EDUCATIONAL MODULES API +++
+  app.get("/api/courses/:id/modules", async (req, res) => {
+    try {
+      const modulesRes = await pool.query(
+        "SELECT * FROM course_modules WHERE course_id = $1 ORDER BY order_index ASC",
+        [req.params.id]
+      );
+      res.json(modulesRes.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch modules" });
+    }
+  });
+
+  app.post("/api/courses/:id/modules", authenticateToken, requirePro, async (req, res) => {
+    const { title_ru, title_tyv, order_index } = req.body;
+    const id = Math.random().toString(36).substr(2, 9);
+    try {
+      await pool.query(
+        "INSERT INTO course_modules (id, course_id, title_ru, title_tyv, order_index) VALUES ($1, $2, $3, $4, $5)",
+        [id, req.params.id, title_ru, title_tyv, order_index || 0]
+      );
+      res.json({ id, success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create module" });
+    }
+  });
+
+  app.put("/api/modules/:id", authenticateToken, requirePro, async (req, res) => {
+    const { title_ru, title_tyv, order_index } = req.body;
+    try {
+      await pool.query(
+        "UPDATE course_modules SET title_ru = $1, title_tyv = $2, order_index = $3 WHERE id = $4",
+        [title_ru, title_tyv, order_index, req.params.id]
+      );
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update module" });
+    }
+  });
+
+  app.delete("/api/modules/:id", authenticateToken, requirePro, async (req, res) => {
+    try {
+      await pool.query("DELETE FROM course_modules WHERE id = $1", [req.params.id]);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete module" });
+    }
+  });
+
+  // +++ LECTURE RESOURCES API +++
+  app.get("/api/lectures/:id/resources", async (req, res) => {
+    try {
+      const resourcesRes = await pool.query(
+        "SELECT * FROM lecture_resources WHERE lecture_id = $1 ORDER BY created_at ASC",
+        [req.params.id]
+      );
+      res.json(resourcesRes.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch resources" });
+    }
+  });
+
+  app.post("/api/lectures/:id/resources", authenticateToken, requirePro, async (req, res) => {
+    const { title, url, type } = req.body;
+    const id = Math.random().toString(36).substr(2, 9);
+    try {
+      await pool.query(
+        "INSERT INTO lecture_resources (id, lecture_id, title, url, type) VALUES ($1, $2, $3, $4, $5)",
+        [id, req.params.id, title, url, type]
+      );
+      res.json({ id, success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to add resource" });
+    }
+  });
+
+  app.delete("/api/resources/:id", authenticateToken, requirePro, async (req, res) => {
+    try {
+      await pool.query("DELETE FROM lecture_resources WHERE id = $1", [req.params.id]);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete resource" });
+    }
+  });
+
+  // +++ CLASSES & ENROLLMENT API +++
+  app.get("/api/classes", authenticateToken, async (req, res) => {
+    try {
+      const userRes = await pool.query("SELECT role FROM users WHERE id = $1", [(req as any).user.id]);
+      const user = userRes.rows[0];
+      
+      let classesRes;
+      if (user.role === 'super_admin' || user.role === 'chief_editor' || user.role === 'teacher') {
+        classesRes = await pool.query("SELECT * FROM classes WHERE teacher_id = $1 ORDER BY created_at DESC", [(req as any).user.id]);
+      } else {
+        classesRes = await pool.query(`
+          SELECT c.* FROM classes c
+          JOIN class_enrollments ce ON c.id = ce.class_id
+          WHERE ce.user_id = $1
+          ORDER BY ce.enrolled_at DESC
+        `, [(req as any).user.id]);
+      }
+      res.json(classesRes.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch classes" });
+    }
+  });
+
+  app.post("/api/classes", authenticateToken, requirePro, async (req, res) => {
+    const { name } = req.body;
+    const id = Math.random().toString(36).substr(2, 9);
+    const inviteCode = Math.random().toString(36).substr(2, 6).toUpperCase();
+    try {
+      await pool.query(
+        "INSERT INTO classes (id, name, teacher_id, invite_code) VALUES ($1, $2, $3, $4)",
+        [id, name, (req as any).user.id, inviteCode]
+      );
+      res.json({ id, inviteCode, success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create class" });
+    }
+  });
+
+  app.post("/api/classes/join", authenticateToken, async (req, res) => {
+    const { inviteCode } = req.body;
+    try {
+      const classRes = await pool.query("SELECT id FROM classes WHERE invite_code = $1", [inviteCode]);
+      if (classRes.rowCount === 0) return res.status(404).json({ error: "Class not found" });
+      
+      const classId = classRes.rows[0].id;
+      await pool.query(
+        "INSERT INTO class_enrollments (class_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        [classId, (req as any).user.id]
+      );
+      res.json({ success: true, classId });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to join class" });
+    }
+  });
+
+  app.get("/api/classes/:id/students", authenticateToken, requirePro, async (req, res) => {
+    try {
+      const studentsRes = await pool.query(`
+        SELECT u.id, u.username, u.full_name, u.avatar, u.grade, ce.enrolled_at
+        FROM users u
+        JOIN class_enrollments ce ON u.id = ce.user_id
+        WHERE ce.class_id = $1
+        ORDER BY u.full_name ASC
+      `, [req.params.id]);
+      res.json(studentsRes.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch students" });
+    }
+  });
+
+  // +++ ASSIGNMENTS API +++
+  app.get("/api/classes/:id/assignments", authenticateToken, async (req, res) => {
+    try {
+      const assignmentsRes = await pool.query(`
+        SELECT a.*, l.title_ru as lecture_title_ru, l.course_id
+        FROM assignments a
+        JOIN lectures l ON a.lecture_id = l.id
+        WHERE a.class_id = $1
+        ORDER BY a.due_date ASC
+      `, [req.params.id]);
+      res.json(assignmentsRes.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch assignments" });
+    }
+  });
+
+  app.post("/api/classes/:id/assignments", authenticateToken, requirePro, async (req, res) => {
+    const { lecture_id, due_date } = req.body;
+    const id = Math.random().toString(36).substr(2, 9);
+    try {
+      await pool.query(
+        "INSERT INTO assignments (id, class_id, lecture_id, due_date) VALUES ($1, $2, $3, $4)",
+        [id, req.params.id, lecture_id, due_date]
+      );
+      res.json({ id, success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create assignment" });
+    }
+  });
+
+  app.get("/api/teacher/dashboard", authenticateToken, requirePro, async (req, res) => {
+    try {
+      const teacherId = (req as any).user.id;
+      
+      const coursesRes = await pool.query("SELECT * FROM courses WHERE created_by = $1", [teacherId]);
+      const classesRes = await pool.query("SELECT * FROM classes WHERE teacher_id = $1", [teacherId]);
+      
+      const statsRes = await pool.query(`
+        SELECT COUNT(DISTINCT ce.user_id) as total_students,
+               COUNT(DISTINCT a.id) as total_assignments
+        FROM classes c
+        LEFT JOIN class_enrollments ce ON c.id = ce.class_id
+        LEFT JOIN assignments a ON c.id = a.class_id
+        WHERE c.teacher_id = $1
+      `, [teacherId]);
+
+      res.json({
+        courses: coursesRes.rows,
+        classes: classesRes.rows,
+        stats: statsRes.rows[0]
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch dashboard" });
     }
   });
 

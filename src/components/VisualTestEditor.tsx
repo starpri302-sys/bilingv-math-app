@@ -73,35 +73,48 @@ export default function VisualTestEditor({ initialBlocks = [], onSave }: VisualT
   return (
     <div className="flex flex-col lg:flex-row gap-8 min-h-[700px] bg-stone-50 p-6 rounded-[2.5rem] border border-stone-200 shadow-inner">
       {/* Visual Canvas Area */}
-      <div className="flex-grow space-y-4 overflow-y-auto max-h-[800px] pr-2 custom-scrollbar">
-        <div className="flex items-center justify-between mb-8 bg-white p-4 rounded-2xl shadow-sm border border-stone-100">
+      <div className="flex-grow flex flex-col gap-6">
+        <div className="flex items-center justify-between bg-white p-6 rounded-[2rem] shadow-sm border border-stone-100">
            <div>
              <h3 className="text-xl font-serif font-black text-stone-900">Пространство теста</h3>
              <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mt-1">Визуальное проектирование</p>
            </div>
-           <div className="flex items-center gap-2">
-              <button 
-                onClick={() => addBlock('text')}
-                className="p-3 bg-stone-50 text-stone-600 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 transition-all border border-stone-100"
-              >
-                <Type className="w-5 h-5" />
-              </button>
-              <button 
-                onClick={() => addBlock('image')}
-                className="p-3 bg-stone-50 text-stone-600 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 transition-all border border-stone-100"
-              >
-                <ImageIcon className="w-5 h-5" />
-              </button>
-              <button 
-                onClick={() => addBlock('question')}
-                className="p-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
-           </div>
+           <div className="flex items-center gap-4">
+             <div className="flex items-center gap-2 border-r border-stone-100 pr-4">
+                <button 
+                  onClick={() => addBlock('text')}
+                  className="p-3 bg-stone-50 text-stone-600 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 transition-all border border-stone-100"
+                  title="Добавить текст"
+                >
+                  <Type className="w-5 h-5" />
+                </button>
+                <button 
+                  onClick={() => addBlock('image')}
+                  className="p-3 bg-stone-50 text-stone-600 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 transition-all border border-stone-100"
+                  title="Добавить изображение"
+                >
+                  <ImageIcon className="w-5 h-5" />
+                </button>
+                <button 
+                  onClick={() => addBlock('question')}
+                  className="p-3 bg-stone-50 text-stone-600 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 transition-all border border-stone-100"
+                  title="Добавить вопрос"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+             </div>
+             <button 
+              onClick={() => onSave(blocks)}
+              className="bg-emerald-600 text-white px-8 py-3.5 rounded-xl font-black shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all uppercase tracking-widest text-xs flex items-center gap-2 active:scale-95"
+             >
+               <CheckCircle2 className="w-5 h-5" />
+               Сохранить тест
+             </button>
+          </div>
         </div>
 
-        <Reorder.Group axis="y" values={blocks} onReorder={setBlocks} className="space-y-4">
+        <div className="flex-grow space-y-4 overflow-y-auto max-h-[700px] pr-2 custom-scrollbar">
+          <Reorder.Group axis="y" values={blocks} onReorder={setBlocks} className="space-y-4">
           {blocks.map((block) => (
             <Reorder.Item 
               key={block.id} 
@@ -179,6 +192,7 @@ export default function VisualTestEditor({ initialBlocks = [], onSave }: VisualT
           </div>
         )}
       </div>
+    </div>
 
       {/* Control Panel Area */}
       <AnimatePresence mode="wait">
@@ -306,7 +320,7 @@ export default function VisualTestEditor({ initialBlocks = [], onSave }: VisualT
                 </div>
               )}
 
-              <div className="pt-8 border-t border-stone-100 flex items-center justify-between">
+              <div className="pt-8 border-t border-stone-100 flex items-center justify-start">
                  <div className="flex gap-2">
                    <button 
                     onClick={() => updateBlock(selectedBlock.id, { layout: 'third' })}
@@ -321,12 +335,6 @@ export default function VisualTestEditor({ initialBlocks = [], onSave }: VisualT
                      <Maximize2 className="w-4 h-4 shrink-0" />
                    </button>
                  </div>
-                 <button 
-                  onClick={() => onSave(blocks)}
-                  className="bg-emerald-600 text-white px-8 py-3 rounded-2xl font-black shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all uppercase tracking-widest text-[10px]"
-                 >
-                   Сохранить всё
-                 </button>
               </div>
             </div>
           ) : (

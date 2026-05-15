@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../store/authContext';
-import { LogIn, LogOut, Shield, BookOpen, ChevronDown } from 'lucide-react';
+import { LogIn, LogOut, Shield, BookOpen, ChevronDown, LayoutDashboard } from 'lucide-react';
 import UserAvatar from './UserAvatar';
 import NotificationCenter from './NotificationCenter';
 
 export default function Navbar() {
-  const { user, profile, isAdmin, login, logout } = useAuth();
+  const { user, profile, isAdmin, isTeacher, isPro, login, logout } = useAuth();
   const [showLoginMenu, setShowLoginMenu] = useState(false);
 
   return (
@@ -24,6 +24,12 @@ export default function Navbar() {
               <Link to="/courses" className="text-sm font-semibold text-stone-600 hover:text-emerald-600 transition-colors uppercase tracking-wider flex items-center gap-1.5">
                 Лекторий
               </Link>
+              {(isTeacher || isAdmin || isPro) && (
+                <Link to="/teacher" className="text-sm font-black text-stone-900 hover:text-emerald-600 transition-colors uppercase tracking-widest flex items-center gap-2 bg-stone-50 px-3 py-1.5 rounded-xl border border-stone-100">
+                  <LayoutDashboard className="w-4 h-4 text-emerald-500" />
+                  Хаб
+                </Link>
+              )}
             </div>
           </div>
 

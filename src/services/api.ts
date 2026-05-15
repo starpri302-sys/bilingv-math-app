@@ -352,5 +352,104 @@ export const api = {
       headers: getAuthHeader()
     });
     return handleResponse(res);
+  },
+  // +++ EDUCATIONAL MODULES API +++
+  async getModules(courseId: string) {
+    const res = await fetch(`/api/courses/${courseId}/modules`);
+    return handleResponse(res);
+  },
+  async createModule(courseId: string, data: any) {
+    const res = await fetch(`/api/courses/${courseId}/modules`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+  async updateModule(id: string, data: any) {
+    const res = await fetch(`/api/modules/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+  async deleteModule(id: string) {
+    const res = await fetch(`/api/modules/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
+  // +++ LECTURE RESOURCES API +++
+  async getLectureResources(lectureId: string) {
+    const res = await fetch(`/api/lectures/${lectureId}/resources`);
+    return handleResponse(res);
+  },
+  async addLectureResource(lectureId: string, data: any) {
+    const res = await fetch(`/api/lectures/${lectureId}/resources`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+  async deleteLectureResource(id: string) {
+    const res = await fetch(`/api/resources/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
+  // +++ CLASSES & ENROLLMENT API +++
+  async getClasses() {
+    const res = await fetch('/api/classes', {
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
+  async createClass(data: any) {
+    const res = await fetch('/api/classes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+  async joinClass(inviteCode: string) {
+    const res = await fetch('/api/classes/join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify({ inviteCode })
+    });
+    return handleResponse(res);
+  },
+  async getClassStudents(classId: string) {
+    const res = await fetch(`/api/classes/${classId}/students`, {
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
+  // +++ ASSIGNMENTS API +++
+  async getClassAssignments(classId: string) {
+    const res = await fetch(`/api/classes/${classId}/assignments`, {
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
+  async createAssignment(classId: string, data: any) {
+    const res = await fetch(`/api/classes/${classId}/assignments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+  // +++ TEACHER DASHBOARD API +++
+  async getTeacherDashboard() {
+    const res = await fetch('/api/teacher/dashboard', {
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
   }
 };

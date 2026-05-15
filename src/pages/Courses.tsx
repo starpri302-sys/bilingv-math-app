@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { GraduationCap, BookOpen, Clock, ChevronRight, Lock, Sparkles, Search, Plus, X, ChevronLeft, FileText, CheckCircle2, Edit3, Trash2, Trophy, BarChart3, HelpCircle } from 'lucide-react';
+import { GraduationCap, BookOpen, Clock, ChevronRight, Lock, Sparkles, Search, Plus, X, ChevronLeft, FileText, CheckCircle2, Edit3, Trash2, Trophy, BarChart3, HelpCircle, FolderPlus, Layers } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../store/authContext';
 import SEO from '../components/SEO';
@@ -22,6 +22,7 @@ interface Course {
 
 interface Lecture {
   id: string;
+  module_id: string | null;
   title_ru: string;
   title_tyv: string;
   content_ru: string;
@@ -30,6 +31,14 @@ interface Lecture {
   is_free: number;
   item_type: 'theory' | 'test';
   quiz?: any;
+}
+
+interface CourseModule {
+  id: string;
+  course_id: string;
+  title_ru: string;
+  title_tyv: string;
+  order_index: number;
 }
 
 export default function Courses() {
@@ -53,11 +62,15 @@ export default function Courses() {
 
   // Detail States
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [modules, setModules] = useState<CourseModule[]>([]);
   const [lectures, setLectures] = useState<Lecture[]>([]);
   const [userProgress, setUserProgress] = useState<any[]>([]);
   const [lecturesLoading, setLecturesLoading] = useState(false);
   const [editingLecture, setEditingLecture] = useState<Lecture | null>(null);
   const [createType, setCreateType] = useState<'theory' | 'test' | null>(null);
+  const [showModuleModal, setShowModuleModal] = useState(false);
+  const [editingModule, setEditingModule] = useState<CourseModule | null>(null);
+  const [newModule, setNewModule] = useState({ title_ru: '', title_tyv: '', order_index: 0 });
 
   const { isPro, isTeacher, user, profile } = useAuth();
 
@@ -94,10 +107,14 @@ export default function Courses() {
   const fetchCourseLectures = async (courseId: string) => {
     setLecturesLoading(true);
     try {
-      const data = await api.getCourseLectures(courseId);
-      setLectures(data);
+      const [lecturesData, modulesData] = await Promise.all([
+        api.getCourseLectures(courseId),
+        api.getModules(courseId)
+      ]);
+      setLectures(lecturesData);
+      setModules(modulesData);
     } catch (err) {
-      console.error('Failed to fetch lectures:', err);
+      console.error('Failed to fetch lectures or modules:', err);
     } finally {
       setLecturesLoading(false);
     }
@@ -220,6 +237,37 @@ export default function Courses() {
       console.error('Failed to save lecture:', err);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveModule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !newModule.title_ru) return;
+    setIsSubmitting(true);
+    try {
+      if (editingModule) {
+        await api.updateModule(editingModule.id, newModule);
+      } else {
+        await api.createModule(id, newModule);
+      }
+      setShowModuleModal(false);
+      setEditingModule(null);
+      setNewModule({ title_ru: '', title_tyv: '', order_index: 0 });
+      fetchCourseLectures(id);
+    } catch (err) {
+      console.error('Failed to save module:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteModule = async (moduleId: string) => {
+    if (!window.confirm('Удалить модуль? Подключенные лекции останутся без модуля.')) return;
+    try {
+      await api.deleteModule(moduleId);
+      fetchCourseLectures(id!);
+    } catch (err) {
+      console.error('Failed to delete module:', err);
     }
   };
 
@@ -374,10 +422,17 @@ export default function Courses() {
                    </button>
                    <button 
                      onClick={() => { setCreateType('test'); setShowLectureEditor(true); }}
+                     className="flex items-center gap-2 bg-stone-100 text-stone-600 px-6 py-3 rounded-2xl font-bold hover:bg-stone-200 transition-all active:scale-95"
+                   >
+                     <HelpCircle className="w-5 h-5 text-amber-500" />
+                     Тест
+                   </button>
+                   <button 
+                     onClick={() => { setEditingModule(null); setNewModule({ title_ru: '', title_tyv: '', order_index: modules.length }); setShowModuleModal(true); }}
                      className="flex items-center gap-2 bg-stone-900 text-white px-6 py-3 rounded-2xl font-bold hover:bg-emerald-600 transition-all active:scale-95 shadow-lg shadow-stone-200"
                    >
-                     <Plus className="w-5 h-5" />
-                     Тест
+                     <FolderPlus className="w-5 h-5 text-emerald-400" />
+                     Модуль
                    </button>
                  </div>
               </div>
@@ -461,91 +516,90 @@ export default function Courses() {
                    {[1, 2, 3].map(i => <div key={i} className="h-20 bg-white rounded-2xl animate-pulse border border-stone-100" />)}
                  </div>
                ) : (
-                  <div className="space-y-4">
-                    {lectures.map((lecture, idx) => (
-                      <motion.div
-                        key={lecture.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: idx * 0.05 }}
-                        className="group relative"
-                      >
-                        <div className="flex gap-4">
-                          <Link 
-                            to={`/lectures/${lecture.id}`}
-                            className="flex-grow block bg-white rounded-3xl border border-stone-200 p-6 sm:p-8 hover:shadow-xl hover:border-emerald-100 transition-all duration-300 relative overflow-hidden"
-                          >
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -mr-16 -mt-16 opacity-0 group-hover:opacity-100 transition-all duration-500 scale-0 group-hover:scale-100" />
-                            
-                            <div className="flex items-center gap-6 relative">
-                          <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-mono font-black border transition-colors bg-stone-50 text-stone-300 border-stone-100 group-hover:bg-emerald-50 group-hover:text-emerald-500">
-                             {lecture.item_type === 'test' ? (userProgress.some((p: any) => p.lecture_id === lecture.id) ? <Trophy className="w-6 h-6 text-emerald-600" /> : <HelpCircle className="w-6 h-6" />) : (userProgress.some((p: any) => p.lecture_id === lecture.id) ? <CheckCircle2 className="w-6 h-6 text-emerald-600" /> : idx + 1)}
-                          </div>
-                          <div className="flex-grow">
-                            <h3 className="text-lg sm:text-xl font-bold text-stone-900 mb-1 group-hover:text-emerald-600 transition-colors">
-                              <div className="flex items-center gap-3">
-                                {lecture.title_ru}
-                                {userProgress.find((p: any) => p.lecture_id === lecture.id)?.score !== undefined && (
-                                  <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 uppercase tracking-widest leading-none">
-                                    {userProgress.find((p: any) => p.lecture_id === lecture.id).score} / {userProgress.find((p: any) => p.lecture_id === lecture.id).max_score}
-                                  </span>
-                                )}
-                              </div>
-                            </h3>
-                            <div className="flex items-center gap-3">
-                              <div className="flex items-center gap-1.5 text-[10px] font-black text-stone-400 uppercase tracking-widest">
-                                {lecture.item_type === 'test' ? <HelpCircle className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
-                                {lecture.item_type === 'test' ? 'Итоговый Тест' : 'Лекция'}
-                              </div>
-                                  {lecture.is_free === 1 ? (
-                                    <span className="text-[10px] font-black text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-md uppercase tracking-widest">Бесплатно</span>
-                                  ) : (
-                                    <span className="text-[10px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md uppercase tracking-widest flex items-center gap-1">
-                                      <Sparkles className="w-3 h-3" />
-                                      Pro
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="shrink-0 text-stone-300 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all">
-                                <ChevronRight className="w-6 h-6" />
-                              </div>
-                            </div>
-                          </Link>
+                  <div className="space-y-12">
+                    {/* Render Modules */}
+                    {modules.map((module) => (
+                      <div key={module.id} className="space-y-6">
+                        <div className="flex items-center justify-between group">
+                          <h3 className="text-xl font-serif font-black text-stone-900 flex items-center gap-3">
+                             <Layers className="w-5 h-5 text-emerald-500" />
+                             {module.title_ru}
+                          </h3>
                           {isPro && (
-                            <div className="flex flex-col gap-2">
-                              <button 
-                                onClick={() => {
-                                  const loadAndEdit = async () => {
-                                    const fullLec = await api.getLecture(lecture.id);
-                                    let fullQuiz = null;
-                                    try {
-                                      fullQuiz = await api.getLectureQuiz(lecture.id);
-                                    } catch (e) {
-                                      console.warn('No quiz found for lecture');
-                                    }
-                                    setEditingLecture({ ...fullLec, quiz: fullQuiz });
-                                    setShowLectureEditor(true);
-                                  };
-                                  loadAndEdit();
-                                }}
-                                className="p-4 bg-white border border-stone-200 rounded-2xl text-stone-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
-                              >
-                                <Edit3 className="w-5 h-5" />
-                              </button>
-                              <button 
-                                onClick={() => handleDeleteLecture(lecture.id)}
-                                className="p-4 bg-white border border-stone-200 rounded-2xl text-stone-400 hover:text-rose-600 hover:border-rose-100 transition-all shadow-sm"
-                              >
-                                <Trash2 className="w-5 h-5" />
-                              </button>
+                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                               <button 
+                                 onClick={() => { setEditingModule(module); setNewModule({ title_ru: module.title_ru, title_tyv: module.title_tyv || '', order_index: module.order_index }); setShowModuleModal(true); }}
+                                 className="p-2 text-stone-400 hover:text-emerald-600"
+                               >
+                                 <Edit3 className="w-4 h-4" />
+                               </button>
+                               <button 
+                                 onClick={() => handleDeleteModule(module.id)}
+                                 className="p-2 text-stone-400 hover:text-rose-600"
+                               >
+                                 <Trash2 className="w-4 h-4" />
+                               </button>
                             </div>
                           )}
                         </div>
-                      </motion.div>
+                        <div className="space-y-4 ml-8 border-l-2 border-stone-100 pl-8">
+                          {lectures.filter(l => l.module_id === module.id).map((lecture, idx) => (
+                            <LectureCard 
+                              key={lecture.id} 
+                              lecture={lecture} 
+                              idx={idx} 
+                              userProgress={userProgress} 
+                              isPro={isPro}
+                              onEdit={() => {
+                                const loadAndEdit = async () => {
+                                  const fullLec = await api.getLecture(lecture.id);
+                                  let fullQuiz = null;
+                                  try { fullQuiz = await api.getLectureQuiz(lecture.id); } catch(e) {}
+                                  setEditingLecture({ ...fullLec, quiz: fullQuiz });
+                                  setShowLectureEditor(true);
+                                };
+                                loadAndEdit();
+                              }}
+                              onDelete={() => handleDeleteLecture(lecture.id)}
+                            />
+                          ))}
+                          {lectures.filter(l => l.module_id === module.id).length === 0 && (
+                            <p className="text-xs text-stone-400 font-bold uppercase tracking-widest py-4">В этом модуле пока нет лекций</p>
+                          )}
+                        </div>
+                      </div>
                     ))}
+
+                    {/* Uncategorized Lectures */}
+                    {lectures.filter(l => !l.module_id).length > 0 && (
+                      <div className="space-y-6">
+                        <h3 className="text-xl font-serif font-black text-stone-400">Вне модулей</h3>
+                        <div className="space-y-4">
+                          {lectures.filter(l => !l.module_id).map((lecture, idx) => (
+                             <LectureCard 
+                              key={lecture.id} 
+                              lecture={lecture} 
+                              idx={idx} 
+                              userProgress={userProgress} 
+                              isPro={isPro}
+                              onEdit={() => {
+                                const loadAndEdit = async () => {
+                                  const fullLec = await api.getLecture(lecture.id);
+                                  let fullQuiz = null;
+                                  try { fullQuiz = await api.getLectureQuiz(lecture.id); } catch(e) {}
+                                  setEditingLecture({ ...fullLec, quiz: fullQuiz });
+                                  setShowLectureEditor(true);
+                                };
+                                loadAndEdit();
+                              }}
+                              onDelete={() => handleDeleteLecture(lecture.id)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
+               )}
 
                {lectures.length === 0 && !lecturesLoading && (
                  <div className="text-center py-20 bg-white rounded-[3rem] border border-stone-200">
@@ -697,6 +751,56 @@ export default function Courses() {
         </div>
       )}
 
+      {/* Module Modal */}
+      {showModuleModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-md">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl relative"
+          >
+            <button 
+              onClick={() => setShowModuleModal(false)}
+              className="absolute top-6 right-6 text-stone-400 hover:text-stone-900 transition-colors p-2"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <div className="p-8 sm:p-10">
+              <h2 className="text-2xl font-serif font-black text-stone-900 mb-8">
+                {editingModule ? 'Редактировать модуль' : 'Новый модуль'}
+              </h2>
+              <form onSubmit={handleSaveModule} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Название (RU)</label>
+                  <input 
+                    required
+                    value={newModule.title_ru}
+                    onChange={(e) => setNewModule({ ...newModule, title_ru: e.target.value })}
+                    className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-emerald-500/10"
+                    placeholder="Напр: Основы тригонометрии"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Название (TYV)</label>
+                  <input 
+                    value={newModule.title_tyv}
+                    onChange={(e) => setNewModule({ ...newModule, title_tyv: e.target.value })}
+                    className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-emerald-500/10"
+                  />
+                </div>
+                <button 
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-stone-900 text-white rounded-2xl py-5 font-black hover:bg-emerald-600 transition-all disabled:opacity-50 uppercase tracking-widest text-xs"
+                >
+                  {isSubmitting ? 'Сохранение...' : 'Сохранить модуль'}
+                </button>
+              </form>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-md">
            <motion.div 
@@ -793,6 +897,7 @@ export default function Courses() {
                       <h2 className="text-xl font-bold text-stone-900 group-hover:text-emerald-600 transition-colors mb-1">
                         {course.title_ru}
                       </h2>
+
                       <p className="text-sm font-medium text-stone-400 italic">
                         {course.title_tyv}
                       </p>
@@ -863,5 +968,77 @@ export default function Courses() {
         )}
       </div>
     </div>
+  );
+}
+
+function LectureCard({ lecture, idx, userProgress, isPro, onEdit, onDelete }: { 
+  lecture: any, idx: number, userProgress: any[], isPro: boolean, onEdit: () => void, onDelete: () => void 
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: idx * 0.05 }}
+      className="group relative"
+    >
+      <div className="flex gap-4">
+        <Link 
+          to={`/lectures/${lecture.id}`}
+          className="flex-grow block bg-white rounded-3xl border border-stone-200 p-6 sm:p-8 hover:shadow-xl hover:border-emerald-100 transition-all duration-300 relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -mr-16 -mt-16 opacity-0 group-hover:opacity-100 transition-all duration-500 scale-0 group-hover:scale-100" />
+          <div className="flex items-center gap-6 relative">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-mono font-black border transition-colors bg-stone-50 text-stone-300 border-stone-100 group-hover:bg-emerald-50 group-hover:text-emerald-500">
+               {lecture.item_type === 'test' ? (userProgress.some((p: any) => p.lecture_id === lecture.id) ? <Trophy className="w-6 h-6 text-emerald-600" /> : <HelpCircle className="w-6 h-6" />) : (userProgress.some((p: any) => p.lecture_id === lecture.id) ? <CheckCircle2 className="w-6 h-6 text-emerald-600" /> : idx + 1)}
+            </div>
+            <div className="flex-grow">
+              <h3 className="text-lg sm:text-xl font-bold text-stone-900 mb-1 group-hover:text-emerald-600 transition-colors">
+                <div className="flex items-center gap-3">
+                  {lecture.title_ru}
+                  {userProgress.find((p: any) => p.lecture_id === lecture.id)?.score !== undefined && (
+                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 uppercase tracking-widest leading-none">
+                      {userProgress.find((p: any) => p.lecture_id === lecture.id).score} / {userProgress.find((p: any) => p.lecture_id === lecture.id).max_score}
+                    </span>
+                  )}
+                </div>
+              </h3>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 text-[10px] font-black text-stone-400 uppercase tracking-widest">
+                  {lecture.item_type === 'test' ? <HelpCircle className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+                  {lecture.item_type === 'test' ? 'Итоговый Тест' : 'Лекция'}
+                </div>
+                {lecture.is_free === 1 ? (
+                  <span className="text-[10px] font-black text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-md uppercase tracking-widest">Бесплатно</span>
+                ) : (
+                  <span className="text-[10px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md uppercase tracking-widest flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" />
+                    Pro
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="shrink-0 text-stone-300 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all">
+              <ChevronRight className="w-6 h-6" />
+            </div>
+          </div>
+        </Link>
+        {isPro && (
+          <div className="flex flex-col gap-2">
+            <button 
+              onClick={onEdit}
+              className="p-4 bg-white border border-stone-200 rounded-2xl text-stone-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
+            >
+              <Edit3 className="w-5 h-5" />
+            </button>
+            <button 
+              onClick={onDelete}
+              className="p-4 bg-white border border-stone-200 rounded-2xl text-stone-400 hover:text-rose-600 hover:border-rose-100 transition-all shadow-sm"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+      </div>
+    </motion.div>
   );
 }

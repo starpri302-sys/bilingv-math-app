@@ -18,6 +18,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import Courses from './pages/Courses';
 import LectureDetail from './pages/LectureDetail';
+import TeacherDashboard from './pages/TeacherDashboard';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 
@@ -45,6 +46,7 @@ export default function App() {
               <Route path="/courses" element={<Courses />} />
               <Route path="/courses/:id" element={<Courses />} />
               <Route path="/lectures/:id" element={<LectureDetail />} />
+              <Route path="/teacher" element={<TeacherDashboard />} />
             </Routes>
           </main>
           <Footer />
