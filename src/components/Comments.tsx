@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../store/authContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, MessageSquare, Clock } from 'lucide-react';
+import { Send, MessageSquare, Clock, ImageIcon } from 'lucide-react';
 import UserAvatar from './UserAvatar';
+import MathText from './MathText';
 
 interface CommentsProps {
   termId: string;
@@ -49,6 +50,24 @@ export default function Comments({ termId }: CommentsProps) {
     }
   };
 
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const blob = items[i].getAsFile();
+        if (!blob) continue;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64 = event.target?.result as string;
+          const imgTag = `<img src="${base64}" class="max-w-full rounded-2xl shadow-md my-4" />`;
+          setNewComment(prev => prev + (prev.length > 0 ? "\n" : "") + imgTag + "\n");
+        };
+        reader.readAsDataURL(blob);
+      }
+    }
+  };
+
   return (
     <div className="space-y-8 pt-12 border-t border-stone-200">
       <div className="flex items-center gap-3">
@@ -57,21 +76,28 @@ export default function Comments({ termId }: CommentsProps) {
       </div>
 
       {user ? (
-        <form onSubmit={handleSubmit} className="relative">
-          <textarea
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Оставьте ваш комментарий или вопрос..."
-            className="w-full p-6 bg-white border border-stone-200 rounded-3xl shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all min-h-[120px] text-stone-700 font-medium"
-          />
-          <button
-            type="submit"
-            disabled={!newComment.trim()}
-            className="absolute right-4 bottom-4 bg-emerald-600 text-white p-3 rounded-2xl hover:bg-emerald-700 transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Send className="w-5 h-5" />
-          </button>
-        </form>
+        <div className="space-y-2">
+          <form onSubmit={handleSubmit} className="relative">
+            <textarea
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              onPaste={handlePaste}
+              placeholder="Оставьте ваш комментарий или вопрос... Можно вставить картинку."
+              className="w-full p-6 bg-white border border-stone-200 rounded-3xl shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all min-h-[120px] text-stone-700 font-medium"
+            />
+            <button
+              type="submit"
+              disabled={!newComment.trim()}
+              className="absolute right-4 bottom-4 bg-emerald-600 text-white p-3 rounded-2xl hover:bg-emerald-700 transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Send className="w-5 h-5" />
+            </button>
+          </form>
+          <p className="text-[10px] text-stone-400 italic px-4 flex items-center gap-1">
+            <ImageIcon className="w-3 h-3" />
+            Вы можете вставить изображение из буфера обмена (Ctrl+V)
+          </p>
+        </div>
       ) : (
         <div className="p-6 bg-stone-50 border border-stone-200 rounded-3xl text-center space-y-2">
           <p className="text-stone-600 font-medium">Пожалуйста, войдите в систему, чтобы оставить комментарий.</p>
@@ -97,7 +123,9 @@ export default function Comments({ termId }: CommentsProps) {
                     <span>{new Date(comment.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
-                <p className="text-stone-600 leading-relaxed font-medium">{comment.content}</p>
+                <div className="text-stone-600 leading-relaxed font-medium comment-content">
+                  <MathText text={comment.content} isHtml />
+                </div>
               </div>
             </motion.div>
           ))}

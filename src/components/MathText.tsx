@@ -53,23 +53,45 @@ export default function MathText({ text, className, as: Component = 'span', isHt
 
   // Plain text processing
   const renderTextWithDigits = (rawText: string) => {
-    const textParts = rawText.split(/(\d+|\+|-|=|>|<|\*|\/|\^|√)/g);
-    return textParts.map((part, index) => {
-      if (/^\d+$/.test(part)) {
+    // Handle video links first
+    const videoRegex = /(https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|vimeo\.com)\/\S+)/g;
+    const parts = rawText.split(videoRegex);
+    
+    return parts.map((part, index) => {
+      if (videoRegex.test(part)) {
+        let embedUrl = part;
+        if (part.includes('youtube.com') || part.includes('youtu.be')) {
+          const videoId = part.split('v=')[1]?.split('&')[0] || part.split('/').pop();
+          embedUrl = `https://www.youtube.com/embed/${videoId}`;
+        } else if (part.includes('vimeo.com')) {
+          const videoId = part.split('/').pop();
+          embedUrl = `https://player.vimeo.com/video/${videoId}`;
+        }
         return (
-          <span key={index} className="font-mono font-medium text-[1.1em] text-emerald-700 bg-emerald-50/50 px-0.5 rounded leading-none">
-            {part}
-          </span>
+          <div key={index} className="my-8 rounded-3xl overflow-hidden shadow-xl aspect-video bg-black">
+            <iframe className="w-full h-full" src={embedUrl} allowFullScreen />
+          </div>
         );
       }
-      if (/^(\+|-|=|>|<|\*|\/|\^|√)$/.test(part)) {
-        return (
-          <span key={index} className="font-mono font-black text-emerald-600 scale-110 inline-block mx-0.5">
-            {part}
-          </span>
-        );
-      }
-      return part;
+
+      const textParts = part.split(/(\d+|\+|-|=|>|<|\*|\/|\^|√)/g);
+      return textParts.map((subPart, subIndex) => {
+        if (/^\d+$/.test(subPart)) {
+          return (
+            <span key={`${index}-${subIndex}`} className="font-mono font-medium text-[1.1em] text-emerald-700 bg-emerald-50/50 px-0.5 rounded leading-none">
+              {subPart}
+            </span>
+          );
+        }
+        if (/^(\+|-|=|>|<|\*|\/|\^|√)$/.test(subPart)) {
+          return (
+            <span key={`${index}-${subIndex}`} className="font-mono font-black text-emerald-600 scale-110 inline-block mx-0.5">
+              {subPart}
+            </span>
+          );
+        }
+        return subPart;
+      });
     });
   };
 
