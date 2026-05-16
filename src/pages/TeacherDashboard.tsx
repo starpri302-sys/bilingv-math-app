@@ -115,10 +115,10 @@ export default function TeacherDashboard() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { label: 'Мои курсы', value: data?.courses.length || 0, icon: Layers, color: 'bg-emerald-50 text-emerald-600' },
-          { label: 'Активные классы', value: data?.classes.length || 0, icon: Users, color: 'bg-blue-50 text-blue-600' },
-          { label: 'Всего учеников', value: data?.stats.total_students || 0, icon: GraduationCap, color: 'bg-purple-50 text-purple-600' },
-          { label: 'Назначения', value: data?.stats.total_assignments || 0, icon: ClipboardList, color: 'bg-amber-50 text-amber-600' },
+          { label: 'Мои курсы', value: data?.courses?.length || 0, icon: Layers, color: 'bg-emerald-50 text-emerald-600' },
+          { label: 'Активные классы', value: data?.classes?.length || 0, icon: Users, color: 'bg-blue-50 text-blue-600' },
+          { label: 'Всего учеников', value: data?.stats?.total_students || 0, icon: GraduationCap, color: 'bg-purple-50 text-purple-600' },
+          { label: 'Назначения', value: data?.stats?.total_assignments || 0, icon: ClipboardList, color: 'bg-amber-50 text-amber-600' },
         ].map((stat, i) => (
           <motion.div
             key={i}
@@ -233,7 +233,7 @@ export default function TeacherDashboard() {
 
           {activeTab === 'courses' && (
             <div className="space-y-4">
-               {data?.courses?.slice((coursesPage - 1) * ITEMS_PER_PAGE, coursesPage * ITEMS_PER_PAGE).map((course, idx) => (
+               {(data?.courses || []).slice((coursesPage - 1) * ITEMS_PER_PAGE, coursesPage * ITEMS_PER_PAGE).map((course, idx) => (
                  <Link 
                   key={course.id} 
                   to={`/courses/${course.id}`}
@@ -271,7 +271,7 @@ export default function TeacherDashboard() {
           {activeTab === 'classes' && (
             <div className="space-y-8">
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {data?.classes?.slice((classesPage - 1) * ITEMS_PER_PAGE, classesPage * ITEMS_PER_PAGE).map((cls) => (
+                {(data?.classes || []).slice((classesPage - 1) * ITEMS_PER_PAGE, classesPage * ITEMS_PER_PAGE).map((cls) => (
                  <div key={cls.id} className="bg-white p-8 rounded-[2rem] border border-stone-200 shadow-sm hover:shadow-md transition-all">
                     <div className="flex items-center justify-between mb-6">
                       <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">

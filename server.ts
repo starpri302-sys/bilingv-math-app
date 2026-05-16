@@ -1003,34 +1003,6 @@ async function startServer() {
     }
   });
 
-  // +++ TEACHER DASHBOARD API +++
-  app.get("/api/teacher/dashboard", authenticateToken, requirePro, async (req, res) => {
-    try {
-      const userId = (req as any).user.id;
-      const [courses, classes, latestCompletions] = await Promise.all([
-        pool.query("SELECT * FROM courses WHERE created_by = $1 ORDER BY created_at DESC", [userId]),
-        pool.query("SELECT * FROM classes WHERE teacher_id = $1 ORDER BY created_at DESC", [userId]),
-        pool.query(`
-          SELECT lc.*, u.username, l.title_ru as lecture_title, c.title_ru as course_title
-          FROM lecture_completions lc
-          JOIN users u ON lc.user_id = u.id
-          JOIN lectures l ON lc.lecture_id = l.id
-          JOIN courses c ON l.course_id = c.id
-          WHERE c.created_by = $1
-          ORDER BY lc.completed_at DESC
-          LIMIT 10
-        `, [userId])
-      ]);
-      res.json({
-        courses: courses.rows,
-        classes: classes.rows,
-        latestCompletions: latestCompletions.rows
-      });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch teacher dashboard" });
-    }
-  });
-
   // +++ LECTURE RESOURCES API +++
   app.get("/api/lectures/:id/resources", async (req, res) => {
     try {
@@ -1923,7 +1895,8 @@ async function startServer() {
       const { status, subjectId, grade, createdBy } = req.query;
       console.log(`GET /api/terms - Filters: status=${status}, subjectId=${subjectId}, grade=${grade}, createdBy=${createdBy}`);
       let query = `
-        SELECT t.*, u.username as author_name, u.avatar as author_avatar, u.full_name as author_full_name
+        SELECT t.*, u.username as author_name, u.avatar as author_avatar, u.full_name as author_full_name,
+               (SELECT COUNT(*) FROM comments WHERE term_id = t.id) as comment_count
         FROM terms t
         LEFT JOIN users u ON t.created_by = u.id
         WHERE 1=1
@@ -1978,7 +1951,8 @@ async function startServer() {
       const termRes = await pool.query(`
         SELECT t.*, 
                u.username as author_name, u.avatar as author_avatar, u.full_name as author_full_name,
-               s.name_ru as subject_name_ru, s.name_tyv as subject_name_tyv
+               s.name_ru as subject_name_ru, s.name_tyv as subject_name_tyv,
+               (SELECT COUNT(*) FROM comments WHERE term_id = t.id) as comment_count
         FROM terms t
         LEFT JOIN users u ON t.created_by = u.id
         LEFT JOIN subjects s ON t.subject_id = s.id
@@ -2178,7 +2152,8 @@ async function startServer() {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
       const favoritesRes = await pool.query(`
-        SELECT t.*, u.username as author_name, u.avatar as author_avatar, u.full_name as author_full_name
+        SELECT t.*, u.username as author_name, u.avatar as author_avatar, u.full_name as author_full_name,
+               (SELECT COUNT(*) FROM comments WHERE term_id = t.id) as comment_count
         FROM favorites f
         JOIN terms t ON f.term_id = t.id
         LEFT JOIN users u ON t.created_by = u.id
@@ -2277,16 +2252,44 @@ async function startServer() {
     }
   });
 
-  app.post("/api/terms/:termId/comments", async (req, res) => {
-    const { id, user_id, username, avatar, content } = req.body;
+  app.post("/api/terms/:termId/comments", authenticateToken, async (req, res) => {
+    const { content } = req.body;
+    const id = Math.random().toString(36).substr(2, 9);
     try {
+      // Get user info
+      const userRes = await pool.query("SELECT username, avatar FROM users WHERE id = $1", [(req as any).user.id]);
+      const user = userRes.rows[0];
+
       await pool.query(`
         INSERT INTO comments (id, term_id, user_id, username, avatar, content)
         VALUES ($1, $2, $3, $4, $5, $6)
-      `, [id, req.params.termId, user_id, username, avatar, content]);
+      `, [id, req.params.termId, (req as any).user.id, user.username, user.avatar, content]);
+      res.json({ id, success: true });
+    } catch (error) {
+      console.error('Add comment error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/terms/:termId/comments/:commentId", authenticateToken, async (req, res) => {
+    try {
+      const commentRes = await pool.query("SELECT user_id FROM comments WHERE id = $1", [req.params.commentId]);
+      if (commentRes.rows.length === 0) {
+        return res.status(404).json({ error: "Comment not found" });
+      }
+
+      const comment = commentRes.rows[0];
+      const isOwner = comment.user_id === (req as any).user.id;
+      const isAdmin = (req as any).user.role === 'super_admin' || (req as any).user.role === 'chief_editor';
+
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      await pool.query("DELETE FROM comments WHERE id = $1", [req.params.commentId]);
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: "Internal server error" });
+      res.status(500).json({ error: "Failed to delete comment" });
     }
   });
 

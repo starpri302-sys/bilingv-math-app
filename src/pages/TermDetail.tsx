@@ -5,9 +5,10 @@ import BilingualEditor from '../components/BilingualEditor';
 import MathText from '../components/MathText';
 import SEO from '../components/SEO';
 import UserAvatar from '../components/UserAvatar';
+import Comments from '../components/Comments';
 import { useAuth } from '../store/authContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Book, Info, Lightbulb, Share2, Languages, Edit3, Trash2, User, Heart } from 'lucide-react';
+import { ArrowLeft, Book, Info, Lightbulb, Share2, Languages, Edit3, Trash2, User, Heart, MessageSquare } from 'lucide-react';
 
 export default function TermDetail() {
   const { id } = useParams<{ id: string }>();
@@ -219,6 +220,12 @@ export default function TermDetail() {
               <User className="w-4 h-4 text-emerald-600" />
               <span>Класс {term.grade}</span>
             </div>
+            {term.comment_count > 0 && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-2xl text-xs font-bold uppercase tracking-widest border border-emerald-100">
+                <MessageSquare className="w-4 h-4" />
+                <span>{term.comment_count} {term.comment_count === 1 ? 'комментарий' : term.comment_count < 5 ? 'комментария' : 'комментариев'}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -449,6 +456,11 @@ export default function TermDetail() {
           })}
         </div>
       </motion.div>
+
+      {/* Comments Section */}
+      <div className="max-w-4xl mx-auto w-full">
+        <Comments termId={id!} />
+      </div>
 
       <AnimatePresence>
         {showEditor && (

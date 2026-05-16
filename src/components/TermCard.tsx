@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Book, ChevronRight, User, Heart } from 'lucide-react';
+import { Book, ChevronRight, User, Heart, MessageSquare } from 'lucide-react';
 import UserAvatar from './UserAvatar';
 import MathText from './MathText';
 import { api } from '../services/api';
@@ -148,10 +148,19 @@ export default function TermCard({ term, language }: TermCardProps) {
           </div>
         </div>
         
-        <Link to={`/term/${term.id}`} className="flex items-center gap-1 text-emerald-600 font-bold text-sm hover:underline shrink-0 ml-4">
-          <span>Подробнее</span>
-          <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-        </Link>
+        <div className="flex items-center gap-4">
+          {term.comment_count > 0 && (
+            <div className="flex items-center gap-1 text-stone-400 font-bold text-[10px] uppercase tracking-widest">
+              <MessageSquare className="w-3 h-3" />
+              <span>{term.comment_count}</span>
+            </div>
+          )}
+          
+          <Link to={`/term/${term.id}`} className="flex items-center gap-1 text-emerald-600 font-bold text-sm hover:underline shrink-0">
+            <span>Подробнее</span>
+            <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </Link>
+        </div>
       </div>
     </motion.div>
   );

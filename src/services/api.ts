@@ -169,8 +169,15 @@ export const api = {
   async addComment(termId: string, comment: any) {
     const res = await fetch(`/api/terms/${termId}/comments`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
       body: JSON.stringify(comment)
+    });
+    return handleResponse(res);
+  },
+  async deleteComment(termId: string, commentId: string) {
+    const res = await fetch(`/api/terms/${termId}/comments/${commentId}`, {
+      method: 'DELETE',
+      headers: getAuthHeader()
     });
     return handleResponse(res);
   },

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../store/authContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, MessageSquare, Clock, ImageIcon } from 'lucide-react';
+import { Send, MessageSquare, Clock, ImageIcon, Trash2 } from 'lucide-react';
 import UserAvatar from './UserAvatar';
 import MathText from './MathText';
 
@@ -11,7 +11,7 @@ interface CommentsProps {
 }
 
 export default function Comments({ termId }: CommentsProps) {
-  const { user, profile } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
@@ -38,15 +38,22 @@ export default function Comments({ termId }: CommentsProps) {
 
     try {
       await api.addComment(termId, {
-        user_id: user.id,
-        username: profile?.username || user.username,
-        avatar: profile?.avatar || '',
         content: newComment
       });
       setNewComment('');
       fetchComments();
     } catch (error) {
       console.error('Error adding comment:', error);
+    }
+  };
+
+  const handleDelete = async (commentId: string) => {
+    if (!window.confirm('Вы уверены, что хотите удалить этот комментарий?')) return;
+    try {
+      await api.deleteComment(termId, commentId);
+      fetchComments();
+    } catch (error) {
+      console.error('Error deleting comment:', error);
     }
   };
 
@@ -118,9 +125,20 @@ export default function Comments({ termId }: CommentsProps) {
               <div className="flex-1 space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="font-bold text-stone-900">{comment.username}</span>
-                  <div className="flex items-center gap-1 text-stone-400 text-xs font-medium">
-                    <Clock className="w-3 h-3" />
-                    <span>{new Date(comment.created_at).toLocaleDateString()}</span>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1 text-stone-400 text-xs font-medium">
+                      <Clock className="w-3 h-3" />
+                      <span>{new Date(comment.created_at).toLocaleDateString()}</span>
+                    </div>
+                    {(user?.id === comment.user_id || isAdmin) && (
+                      <button
+                        onClick={() => handleDelete(comment.id)}
+                        className="text-stone-300 hover:text-red-500 transition-colors"
+                        title="Удалить"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="text-stone-600 leading-relaxed font-medium comment-content">
