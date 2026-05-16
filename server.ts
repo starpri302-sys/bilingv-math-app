@@ -312,6 +312,18 @@ async function initDb(forceReinstall = false) {
         color TEXT
       );
 
+      ALTER TABLE lectures ADD COLUMN IF NOT EXISTS visibility TEXT DEFAULT 'public';
+      ALTER TABLE lectures ADD COLUMN IF NOT EXISTS access_type TEXT DEFAULT 'free';
+
+      CREATE TABLE IF NOT EXISTS lecture_access (
+        id TEXT PRIMARY KEY,
+        lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        expires_at TIMESTAMP,
+        granted_by TEXT REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE TABLE IF NOT EXISTS languages (
         code TEXT PRIMARY KEY,
         name TEXT,
@@ -533,7 +545,7 @@ async function startServer() {
   app.get("/api/courses", async (req, res) => {
     try {
       const coursesRes = await pool.query(`
-        SELECT c.*, s.name_ru as subject_name_ru, s.name_tyv as subject_name_tyv 
+        SELECT c.*, s.name_ru as subject_name_ru, s.name_tyv as subject_name_tyv, s.color as subject_color
         FROM courses c 
         LEFT JOIN subjects s ON c.subject_id = s.id 
         ORDER BY c.created_at DESC
@@ -1796,11 +1808,11 @@ async function startServer() {
     }
   });
 
-  app.post("/api/subjects", async (req, res) => {
-    const { id, slug, name_ru, name_tyv, icon, color, user_role } = req.body;
-    if (user_role !== 'super_admin') {
+  app.post("/api/subjects", authenticateToken, async (req, res) => {
+    if ((req as any).user.role !== 'super_admin') {
       return res.status(403).json({ error: "Forbidden: Only Super-admin can manage subjects" });
     }
+    const { id, slug, name_ru, name_tyv, icon, color } = req.body;
     try {
       const colorCheck = await pool.query("SELECT * FROM subjects WHERE color = $1 AND id != $2", [color, id]);
       if (colorCheck.rows.length > 0) return res.status(400).json({ error: "Color already in use" });
@@ -1821,9 +1833,8 @@ async function startServer() {
     }
   });
 
-  app.delete("/api/subjects/:id", async (req, res) => {
-    const { user_role } = req.query;
-    if (user_role !== 'super_admin') {
+  app.delete("/api/subjects/:id", authenticateToken, async (req, res) => {
+    if ((req as any).user.role !== 'super_admin') {
       return res.status(403).json({ error: "Forbidden" });
     }
     try {

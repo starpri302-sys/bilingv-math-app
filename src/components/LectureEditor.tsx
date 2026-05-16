@@ -27,6 +27,8 @@ interface EditorProps {
   initialContentRu?: string;
   initialContentTyv?: string;
   initialIsFree?: boolean;
+  initialVisibility?: 'public' | 'private';
+  initialAccessType?: 'free' | 'paid';
   initialQuiz?: { questions: QuizQuestion[] } | null;
   initialResources?: Resource[];
   onSave: (data: { 
@@ -35,6 +37,8 @@ interface EditorProps {
     content_ru: string; 
     content_tyv: string; 
     is_free: boolean;
+    visibility: 'public' | 'private';
+    access_type: 'free' | 'paid';
     quiz?: { questions: QuizQuestion[] };
     resources?: Resource[];
   }) => Promise<void>;
@@ -57,6 +61,8 @@ export default function LectureEditor({
   const [contentRu, setContentRu] = useState(initialContentRu);
   const [contentTyv, setContentTyv] = useState(initialContentTyv);
   const [isFree, setIsFree] = useState(initialIsFree);
+  const [visibility, setVisibility] = useState<'public' | 'private'>(initialVisibility || 'public');
+  const [accessType, setAccessType] = useState<'free' | 'paid'>(initialAccessType || 'free');
   const [activeTab, setActiveTab] = useState<'edit' | 'preview' | 'quiz' | 'resources'>('edit');
   const [lang, setLang] = useState<'ru' | 'tyv'>('ru');
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(initialQuiz?.questions || []);
@@ -108,6 +114,8 @@ export default function LectureEditor({
       content_ru: contentRu,
       content_tyv: contentTyv,
       is_free: isFree,
+      visibility,
+      access_type: accessType,
       quiz: quizQuestions.length > 0 ? { questions: quizQuestions } : undefined,
       resources: resources.length > 0 ? resources : undefined
     });
@@ -232,12 +240,21 @@ export default function LectureEditor({
 
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Бесплатная:</span>
+             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">{visibility === 'public' ? 'Публично' : 'Приватно'}:</span>
              <button 
-               onClick={() => setIsFree(!isFree)}
-               className={`w-10 h-5 rounded-full relative transition-colors ${isFree ? 'bg-emerald-500' : 'bg-stone-300'}`}
+               onClick={() => setVisibility(visibility === 'public' ? 'private' : 'public')}
+               className={`w-10 h-5 rounded-full relative transition-colors ${visibility === 'public' ? 'bg-emerald-500' : 'bg-stone-300'}`}
              >
-               <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${isFree ? 'right-1' : 'left-1'}`} />
+               <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${visibility === 'public' ? 'right-1' : 'left-1'}`} />
+             </button>
+          </div>
+          <div className="flex items-center gap-2">
+             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">{accessType === 'free' ? 'Бесплатно' : 'Платно'}:</span>
+             <button 
+               onClick={() => setAccessType(accessType === 'free' ? 'paid' : 'free')}
+               className={`w-10 h-5 rounded-full relative transition-colors ${accessType === 'free' ? 'bg-emerald-500' : 'bg-stone-300'}`}
+             >
+               <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${accessType === 'free' ? 'right-1' : 'left-1'}`} />
              </button>
           </div>
           <button 

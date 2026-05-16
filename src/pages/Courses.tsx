@@ -21,6 +21,7 @@ interface Course {
   description_tyv: string;
   subject_name_ru: string;
   subject_name_tyv: string;
+  subject_color?: string;
   created_at: string;
 }
 
@@ -931,7 +932,7 @@ export default function Courses() {
                 >
                   <div className="p-8 pb-4">
                     <div className="flex justify-between items-start mb-6">
-                      <div className="p-3 bg-stone-50 rounded-2xl border border-stone-100 text-emerald-600">
+                      <div className="p-3 rounded-2xl border border-stone-100" style={course.subject_color ? { backgroundColor: `${course.subject_color}20`, color: course.subject_color } : {}}>
                         <BookOpen className="w-6 h-6" />
                       </div>
                       {isPro ? (
@@ -994,8 +995,8 @@ export default function Courses() {
                   <div className="px-8 pb-8 pt-4">
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center gap-4 text-xs text-stone-400 font-medium tracking-wide">
-                        <div className="flex items-center gap-1.5 bg-stone-100/50 px-2.5 py-1 rounded-lg">
-                          <Sparkles className="w-3 h-3 text-emerald-500" />
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={course.subject_color ? { backgroundColor: `${course.subject_color}10`, color: course.subject_color } : {}}>
+                          <Sparkles className="w-3 h-3" />
                           {course.subject_name_ru}
                         </div>
                       </div>
