@@ -36,6 +36,7 @@ export default function TeacherDashboard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [coursesPage, setCoursesPage] = useState(1);
   const [classesPage, setClassesPage] = useState(1);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
     if (!isTeacher && !isPro) {
@@ -43,21 +44,23 @@ export default function TeacherDashboard() {
       return;
     }
 
-    const fetchDashboard = async () => {
+    const fetchData = async () => {
       try {
-        console.log('Fetching dashboard data...');
-        const dashboardData = await api.getTeacherDashboard();
-        console.log('Received dashboard data:', dashboardData);
+        const [dashboardData, notificationsData] = await Promise.all([
+          api.getTeacherDashboard(),
+          api.getNotifications(user!.id)
+        ]);
         setData(dashboardData);
+        setNotifications(notificationsData);
       } catch (err) {
-        console.error('Failed to fetch dashboard:', err);
+        console.error('Failed to fetch data:', err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchDashboard();
-  }, [isTeacher, isPro, navigate]);
+    fetchData();
+  }, [isTeacher, isPro, navigate, user?.id]);
 
   const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -178,6 +181,33 @@ export default function TeacherDashboard() {
 
           {activeTab === 'overview' && (
             <div className="space-y-8">
+               {/* Notifications Section */}
+               {notifications.length > 0 && (
+                 <div className="bg-white rounded-[2.5rem] border border-stone-200 p-8 shadow-sm">
+                    <div className="flex items-center justify-between mb-8">
+                       <h3 className="text-xl font-serif font-black text-stone-900">Уведомления</h3>
+                    </div>
+                    <div className="space-y-4">
+                       {notifications.map((n) => (
+                         <div key={n.id} className={`p-4 rounded-xl flex items-center justify-between border ${n.is_read ? 'bg-stone-50 border-stone-100' : 'bg-emerald-50 border-emerald-100'}`}>
+                           <p className="text-sm font-medium text-stone-900">{n.message}</p>
+                           {!n.is_read && (
+                             <button 
+                               onClick={async () => {
+                                 await api.markNotificationAsRead(n.id);
+                                 setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, is_read: 1 } : item));
+                               }}
+                               className="text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:underline"
+                             >
+                               Прочитано
+                             </button>
+                           )}
+                         </div>
+                       ))}
+                    </div>
+                 </div>
+               )}
+
                <div className="bg-white rounded-[2.5rem] border border-stone-200 p-8">
                  <div className="flex items-center justify-between mb-8">
                    <h3 className="text-xl font-serif font-black text-stone-900">Последняя активность</h3>

@@ -473,6 +473,13 @@ export const api = {
     });
     return handleResponse(res);
   },
+  async submitAssignment(assignmentId: string) {
+    const res = await fetch(`/api/assignments/${assignmentId}/submit`, {
+      method: 'POST',
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
   // +++ TEACHER DASHBOARD API +++
   async getTeacherDashboard() {
     const res = await fetch('/api/teacher/dashboard', {
@@ -491,6 +498,19 @@ export const api = {
   async revokeLectureAccess(lectureId: string, userId: string) {
     const res = await fetch(`/api/lectures/${lectureId}/access/${userId}`, {
       method: 'DELETE',
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
+  async getNotifications(userId: string) {
+    const res = await fetch(`/api/notifications/${userId}`, {
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
+  async markNotificationAsRead(notificationId: string) {
+    const res = await fetch(`/api/notifications/${notificationId}/read`, {
+      method: 'PATCH',
       headers: getAuthHeader()
     });
     return handleResponse(res);

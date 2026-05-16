@@ -281,9 +281,9 @@ export default function LectureDetail() {
               </div>
             </header>
 
-            {/* Access Control Section for Teacher */}
+            {/* Access Control Section for Admin */}
             {console.log('User:', user, 'Lecture:', lecture)}
-            {lecture.course_created_by === user?.id && (
+            {(user?.role === 'super_admin' || user?.role === 'chief_editor') && (
               <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-6 mb-8">
                 <h4 className="font-bold text-emerald-900 mb-4 flex items-center gap-2">
                   <Lock className="w-5 h-5" />

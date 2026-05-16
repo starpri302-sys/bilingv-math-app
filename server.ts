@@ -321,7 +321,8 @@ async function initDb(forceReinstall = false) {
         user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
         expires_at TIMESTAMP,
         granted_by TEXT REFERENCES users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT lecture_user_unique UNIQUE (lecture_id, user_id)
       );
 
       CREATE TABLE IF NOT EXISTS languages (
@@ -1023,6 +1024,40 @@ async function startServer() {
     }
   });
 
+  app.post("/api/assignments/:assignmentId/submit", authenticateToken, async (req, res) => {
+    const { assignmentId } = req.params;
+    const userId = (req as any).user.id;
+    const submissionId = Math.random().toString(36).substr(2, 9);
+    try {
+      await pool.query(
+        "INSERT INTO assignment_submissions (id, assignment_id, user_id, status) VALUES ($1, $2, $3, $4) ON CONFLICT (assignment_id, user_id) DO UPDATE SET status = 'submitted'",
+        [submissionId, assignmentId, userId, 'submitted']
+      );
+
+      const assignmentInfo = await pool.query(`
+        SELECT a.id, c.teacher_id, l.title_ru as lecture_title
+        FROM assignments a
+        JOIN classes c ON a.class_id = c.id
+        JOIN lectures l ON a.lecture_id = l.id
+        WHERE a.id = $1
+      `, [assignmentId]);
+
+      if (assignmentInfo.rows.length > 0) {
+        const { teacher_id, lecture_title } = assignmentInfo.rows[0];
+        const notificationId = Math.random().toString(36).substr(2, 9);
+        await pool.query(
+          "INSERT INTO notifications (id, user_id, type, message) VALUES ($1, $2, $3, $4)",
+          [notificationId, teacher_id, 'assignment_submitted', `Студент сдал задание: "${lecture_title}"`]
+        );
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Submission Error:', error);
+      res.status(500).json({ error: "Failed to submit assignment" });
+    }
+  });
+
   // +++ TEACHER DASHBOARD API +++
   app.get("/api/teacher/dashboard", authenticateToken, requirePro, async (req, res) => {
     try {
@@ -1065,21 +1100,24 @@ async function startServer() {
     const teacherId = (req as any).user.id;
     
     try {
-      const courseCheck = await pool.query(`
-        SELECT c.created_by 
-        FROM courses c 
-        JOIN lectures l ON l.course_id = c.id 
-        WHERE l.id = $1
-      `, [lectureId]);
+      const userRoleRes = await pool.query("SELECT role FROM users WHERE id = $1", [teacherId]);
+      const userRole = userRoleRes.rows[0]?.role;
+      const isSuperAdmin = userRole === 'super_admin' || userRole === 'chief_editor';
       
-      if (courseCheck.rows.length === 0 || courseCheck.rows[0].created_by !== teacherId) {
-        return res.status(403).json({ error: "Only the course creator can manage access." });
+      // Check if user exists
+      const targetUserRes = await pool.query("SELECT id FROM users WHERE id = $1", [userId]);
+      if (targetUserRes.rows.length === 0) {
+        return res.status(404).json({ error: "User not found." });
+      }
+      
+      if (!isSuperAdmin) {
+        return res.status(403).json({ error: "Only admins can manage access." });
       }
 
       await pool.query(`
         INSERT INTO lecture_access (id, lecture_id, user_id, expires_at, granted_by)
         VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT (id) DO UPDATE SET expires_at = $4
+        ON CONFLICT (lecture_id, user_id) DO UPDATE SET expires_at = $4, granted_by = $5
       `, [Math.random().toString(36).substr(2, 9), lectureId, userId, expiresAt || null, teacherId]);
 
       res.json({ success: true });
@@ -1095,15 +1133,12 @@ async function startServer() {
     const teacherId = (req as any).user.id;
     
     try {
-      const courseCheck = await pool.query(`
-        SELECT c.created_by 
-        FROM courses c 
-        JOIN lectures l ON l.course_id = c.id 
-        WHERE l.id = $1
-      `, [lectureId]);
+      const userRoleRes = await pool.query("SELECT role FROM users WHERE id = $1", [teacherId]);
+      const userRole = userRoleRes.rows[0]?.role;
+      const isSuperAdmin = userRole === 'super_admin' || userRole === 'chief_editor';
       
-      if (courseCheck.rows.length === 0 || courseCheck.rows[0].created_by !== teacherId) {
-        return res.status(403).json({ error: "Only the course creator can manage access." });
+      if (!isSuperAdmin) {
+        return res.status(403).json({ error: "Only admins can manage access." });
       }
 
       await pool.query("DELETE FROM lecture_access WHERE lecture_id = $1 AND user_id = $2", [lectureId, userId]);
