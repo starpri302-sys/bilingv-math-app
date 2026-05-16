@@ -74,6 +74,7 @@ export default function LectureDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [lecture, setLecture] = useState<Lecture | null>(null);
+  const [courseLectures, setCourseLectures] = useState<Lecture[]>([]);
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,6 +130,8 @@ export default function LectureDetail() {
       try {
         const data = await api.getLecture(id!);
         setLecture(data);
+        const lecturesRes = await api.getCourseLectures(data.course_id);
+        setCourseLectures(lecturesRes);
         if (data.item_type === 'test' && data.content_ru) {
           try {
             setVisualBlocks(JSON.parse(data.content_ru));
@@ -239,6 +242,7 @@ export default function LectureDetail() {
       />
 
       <div className="sticky top-16 z-40 bg-white/80 backdrop-blur-md border-b border-stone-200 py-4 shadow-sm">
+        <div className="absolute bottom-0 left-0 h-1 bg-emerald-500 transition-all duration-300" style={{ width: completed ? '100%' : '20%' }} />
         <div className="max-w-4xl mx-auto px-4 md:px-0 flex justify-between items-center">
           <Link to={`/courses/${lecture.course_id}`} className="flex items-center gap-2 text-stone-500 hover:text-emerald-600 font-bold transition-colors">
             <ChevronLeft className="w-5 h-5" />
@@ -266,9 +270,27 @@ export default function LectureDetail() {
         <article className="bg-white rounded-[2.5rem] border border-stone-200 shadow-sm overflow-hidden">
           <div className="p-8 sm:p-12">
             <header className="mb-12">
-              <div className="flex items-center gap-3 text-stone-400 font-bold text-[10px] uppercase tracking-[0.2em] mb-6">
-                <FileText className="w-4 h-4 text-emerald-600" />
-                Лекционный материал
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3 text-stone-400 font-bold text-[10px] uppercase tracking-[0.2em]">
+                  <FileText className="w-4 h-4 text-emerald-600" />
+                  Лекционный материал
+                </div>
+                {/* Navigation */}
+                <div className="flex items-center gap-2">
+                    {(() => {
+                        const idx = courseLectures.findIndex(l => l.id === id);
+                        return (
+                            <>
+                                {idx > 0 && (
+                                    <Link to={`/lectures/${courseLectures[idx-1].id}`} className="text-xs font-bold text-stone-500 hover:text-emerald-600">Назад</Link>
+                                )}
+                                {idx < courseLectures.length - 1 && (
+                                    <Link to={`/lectures/${courseLectures[idx+1].id}`} className="text-xs font-bold text-stone-500 hover:text-emerald-600">Далее</Link>
+                                )}
+                            </>
+                        );
+                    })()}
+                </div>
               </div>
               <h1 className="text-4xl sm:text-5xl font-serif font-black text-stone-900 leading-tight mb-4">
                 <MathText text={lang === 'ru' ? lecture.title_ru : lecture.title_tyv} />

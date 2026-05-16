@@ -27,7 +27,7 @@ interface DashboardData {
 export default function TeacherDashboard() {
   console.log('TeacherDashboard component rendering');
   const navigate = useNavigate();
-  const { user, isPro, isTeacher } = useAuth();
+  const { user, isPro, isTeacher, loading: authLoading } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'courses' | 'classes' | 'resources'>('overview');
@@ -39,6 +39,7 @@ export default function TeacherDashboard() {
   const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isTeacher && !isPro) {
       navigate('/courses');
       return;

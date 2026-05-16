@@ -311,10 +311,12 @@ async function initDb(forceReinstall = false) {
         icon TEXT,
         color TEXT
       );
+    `);
 
-      ALTER TABLE lectures ADD COLUMN IF NOT EXISTS visibility TEXT DEFAULT 'public';
-      ALTER TABLE lectures ADD COLUMN IF NOT EXISTS access_type TEXT DEFAULT 'free';
+    try { await client.exec(`ALTER TABLE lectures ADD COLUMN visibility TEXT DEFAULT 'public'`); } catch (e) {}
+    try { await client.exec(`ALTER TABLE lectures ADD COLUMN access_type TEXT DEFAULT 'free'`); } catch (e) {}
 
+    await client.exec(`
       CREATE TABLE IF NOT EXISTS lecture_access (
         id TEXT PRIMARY KEY,
         lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
