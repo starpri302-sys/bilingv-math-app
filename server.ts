@@ -570,19 +570,26 @@ async function startServer() {
 
   app.get("/api/lectures/:id", authenticateToken, async (req, res) => {
     try {
-      const lectureRes = await pool.query("SELECT * FROM lectures WHERE id = $1", [req.params.id]);
+      const lectureRes = await pool.query(`
+        SELECT l.*, c.created_by as course_created_by 
+        FROM lectures l 
+        JOIN courses c ON l.course_id = c.id 
+        WHERE l.id = $1`, [req.params.id]);
       const lecture = lectureRes.rows[0];
       if (!lecture) return res.status(404).json({ error: "Lecture not found" });
 
-      if (lecture.is_free === 1) {
-        return res.json(lecture);
-      }
+      const userId = (req as any).user.id;
 
-      // Check Pro status
-      const userRes = await pool.query("SELECT subscription_tier, role FROM users WHERE id = $1", [(req as any).user.id]);
+      // Access: free OR teacher OR admin OR pro
+      const userRes = await pool.query("SELECT subscription_tier, role FROM users WHERE id = $1", [userId]);
       const user = userRes.rows[0];
-      if (user.subscription_tier === 'pro' || user.role === 'super_admin' || user.role === 'chief_editor') {
-        res.json(lecture);
+      
+      const isCreator = lecture.course_created_by === userId;
+      const isAdmin = user.role === 'super_admin' || user.role === 'chief_editor';
+      const isPro = user.subscription_tier === 'pro';
+
+      if (lecture.is_free === 1 || isCreator || isAdmin || isPro) {
+        return res.json(lecture);
       } else {
         res.status(403).json({ error: "Pro subscription required", is_pro_needed: true });
       }
@@ -1048,6 +1055,63 @@ async function startServer() {
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Failed to fetch teacher dashboard" });
+    }
+  });
+
+  // +++ LECTURE ACCESS API +++
+  app.post("/api/lectures/:id/access", authenticateToken, async (req, res) => {
+    const lectureId = req.params.id;
+    const { userId, expiresAt } = req.body;
+    const teacherId = (req as any).user.id;
+    
+    try {
+      const courseCheck = await pool.query(`
+        SELECT c.created_by 
+        FROM courses c 
+        JOIN lectures l ON l.course_id = c.id 
+        WHERE l.id = $1
+      `, [lectureId]);
+      
+      if (courseCheck.rows.length === 0 || courseCheck.rows[0].created_by !== teacherId) {
+        return res.status(403).json({ error: "Only the course creator can manage access." });
+      }
+
+      await pool.query(`
+        INSERT INTO lecture_access (id, lecture_id, user_id, expires_at, granted_by)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (id) DO UPDATE SET expires_at = $4
+      `, [Math.random().toString(36).substr(2, 9), lectureId, userId, expiresAt || null, teacherId]);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Failed to grant access" });
+    }
+  });
+
+  app.delete("/api/lectures/:id/access/:userId", authenticateToken, async (req, res) => {
+    const lectureId = req.params.id;
+    const userId = req.params.userId;
+    const teacherId = (req as any).user.id;
+    
+    try {
+      const courseCheck = await pool.query(`
+        SELECT c.created_by 
+        FROM courses c 
+        JOIN lectures l ON l.course_id = c.id 
+        WHERE l.id = $1
+      `, [lectureId]);
+      
+      if (courseCheck.rows.length === 0 || courseCheck.rows[0].created_by !== teacherId) {
+        return res.status(403).json({ error: "Only the course creator can manage access." });
+      }
+
+      await pool.query("DELETE FROM lecture_access WHERE lecture_id = $1 AND user_id = $2", [lectureId, userId]);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Failed to revoke access" });
     }
   });
 

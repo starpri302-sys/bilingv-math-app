@@ -23,6 +23,7 @@ interface Course {
   subject_name_tyv: string;
   subject_color?: string;
   created_at: string;
+  image_url?: string;
 }
 
 interface Lecture {
@@ -62,11 +63,12 @@ export default function Courses() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showLectureEditor, setShowLectureEditor] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [newCourse, setNewCourse] = useState({ title_ru: '', title_tyv: '', desc_ru: '', desc_tyv: '', subject_id: '' });
+  const [newCourse, setNewCourse] = useState({ title_ru: '', title_tyv: '', desc_ru: '', desc_tyv: '', subject_id: '', image_url: '' });
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showStats, setShowStats] = useState(false);
   const [stats, setStats] = useState<any[]>([]);
+  const [viewMode, setViewMode] = useState<'list' | 'card'>('card');
 
   // Detail States
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -194,7 +196,8 @@ export default function Courses() {
           title_ru: newCourse.title_ru,
           title_tyv: newCourse.title_tyv,
           description_ru: newCourse.desc_ru,
-          description_tyv: newCourse.desc_tyv
+          description_tyv: newCourse.desc_tyv,
+          image_url: newCourse.image_url
         });
       } else {
         await api.createCourse({
@@ -202,12 +205,13 @@ export default function Courses() {
           title_ru: newCourse.title_ru,
           title_tyv: newCourse.title_tyv,
           description_ru: newCourse.desc_ru,
-          description_tyv: newCourse.desc_tyv
+          description_tyv: newCourse.desc_tyv,
+          image_url: newCourse.image_url
         });
       }
       setShowCreateModal(false);
       setEditingCourse(null);
-      setNewCourse({ title_ru: '', title_tyv: '', desc_ru: '', desc_tyv: '', subject_id: '' });
+      setNewCourse({ title_ru: '', title_tyv: '', desc_ru: '', desc_tyv: '', subject_id: '', image_url: '' });
       fetchData();
     } catch (err) {
       console.error('Failed to save course:', err);
@@ -371,7 +375,8 @@ export default function Courses() {
                           title_tyv: selectedCourse.title_tyv,
                           desc_ru: selectedCourse.description_ru,
                           desc_tyv: selectedCourse.description_tyv,
-                          subject_id: selectedCourse.subject_id
+                          subject_id: selectedCourse.subject_id,
+                          image_url: selectedCourse.image_url || ''
                         });
                         setShowCreateModal(true);
                      }}
@@ -741,6 +746,20 @@ export default function Courses() {
                <option value="">Все предметы</option>
                {subjects.map(s => <option key={s.id} value={s.id}>{s.name_ru}</option>)}
              </select>
+             <div className="flex bg-white border border-stone-200 rounded-2xl p-1 shrink-0">
+                <button 
+                  onClick={() => setViewMode('card')}
+                  className={`p-3 rounded-xl transition-all ${viewMode === 'card' ? 'bg-emerald-50 text-emerald-600' : 'text-stone-400'}`}
+                >
+                  <Layers className="w-5 h-5" />
+                </button>
+                <button 
+                  onClick={() => setViewMode('list')}
+                  className={`p-3 rounded-xl transition-all ${viewMode === 'list' ? 'bg-emerald-50 text-emerald-600' : 'text-stone-400'}`}
+                >
+                  <FileText className="w-5 h-5" />
+                </button>
+             </div>
           </div>
 
           {isPro && (
@@ -816,6 +835,15 @@ export default function Courses() {
                     value={newCourse.desc_ru}
                     onChange={(e) => setNewCourse({ ...newCourse, desc_ru: e.target.value })}
                     className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 h-32 outline-none focus:ring-4 focus:ring-emerald-500/10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Ссылка на изображение</label>
+                  <input 
+                    value={newCourse.image_url}
+                    onChange={(e) => setNewCourse({ ...newCourse, image_url: e.target.value })}
+                    className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-emerald-500/10"
+                    placeholder="https://example.com/image.jpg"
                   />
                 </div>
 
@@ -921,21 +949,47 @@ export default function Courses() {
           </div>
         ) : currentCourses.length > 0 ? (
           <div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className={viewMode === 'card' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" : "space-y-4"}>
               {currentCourses.map((course, idx) => (
                 <motion.div
                   key={course.id}
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: idx * 0.1 }}
-                  className="group bg-white rounded-3xl border border-stone-200 overflow-hidden hover:shadow-xl transition-all duration-300"
+                  className={viewMode === 'card' 
+                    ? "group bg-white rounded-3xl border border-stone-200 overflow-hidden hover:shadow-xl transition-all duration-300"
+                    : "group bg-white rounded-3xl border border-stone-200 p-6 flex items-center justify-between hover:shadow-lg transition-all duration-300"
+                  }
                 >
-                  <div className="p-8 pb-4">
-                    <div className="flex justify-between items-start mb-6">
-                      <div className="p-3 rounded-2xl border border-stone-100" style={course.subject_color ? { backgroundColor: `${course.subject_color}20`, color: course.subject_color } : {}}>
-                        <BookOpen className="w-6 h-6" />
+                  <div className={viewMode === 'card' ? "p-8 pb-4" : "flex items-center gap-6 flex-grow"}>
+                    {course.image_url && (
+                        <div className={viewMode === 'card' ? "mb-6 rounded-2xl overflow-hidden h-32" : "rounded-2xl overflow-hidden h-20 w-20 flex-shrink-0"}>
+                           <img src={course.image_url} alt={course.title_ru} className="w-full h-full object-cover" />
+                        </div>
+                    )}
+                    <div className={viewMode === 'card' ? "flex justify-between items-start mb-6" : "flex items-center gap-4"}>
+                      {viewMode === 'card' && (
+                        <div className="p-3 rounded-2xl border border-stone-100" style={course.subject_color ? { backgroundColor: `${course.subject_color}20`, color: course.subject_color } : {}}>
+                          <BookOpen className="w-6 h-6" />
+                        </div>
+                      )}
+                      
+                      <div className="space-y-1">
+                        <h2 className="text-xl font-bold text-stone-900 group-hover:text-emerald-600 transition-colors">
+                          {course.title_ru}
+                        </h2>
+                        <p className="text-sm font-medium text-stone-400 italic">
+                          {course.title_tyv}
+                        </p>
                       </div>
-                      {isPro ? (
+                      
+                      {viewMode === 'list' && (
+                         <div className="text-stone-600 text-sm line-clamp-1 ml-auto">
+                          {course.description_ru}
+                        </div>
+                      )}
+                      
+                      {isPro && (
                          <div className="flex items-center gap-2">
                             <button 
                               onClick={(e) => {
@@ -947,7 +1001,8 @@ export default function Courses() {
                                   title_tyv: course.title_tyv,
                                   desc_ru: course.description_ru,
                                   desc_tyv: course.description_tyv,
-                                  subject_id: course.subject_id
+                                  subject_id: course.subject_id,
+                                  image_url: course.image_url || ''
                                 });
                                 setShowCreateModal(true);
                               }}
@@ -966,30 +1021,18 @@ export default function Courses() {
                               <Trash2 className="w-4 h-4" />
                             </button>
                          </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-600 rounded-xl border border-amber-100 text-[10px] font-black uppercase tracking-widest">
-                          <Lock className="w-3 h-3" />
-                          Pro
-                        </div>
                       )}
                     </div>
                     
-                    <div className="space-y-4">
-                      <div>
-                        <h2 className="text-xl font-bold text-stone-900 group-hover:text-emerald-600 transition-colors mb-1">
-                          {course.title_ru}
-                        </h2>
-
-                        <p className="text-sm font-medium text-stone-400 italic">
-                          {course.title_tyv}
-                        </p>
+                    {viewMode === 'card' && (
+                      <div className="space-y-4">
+                        <div className="bg-stone-50/50 rounded-2xl p-4 border border-stone-100/50">
+                          <p className="text-stone-600 text-sm line-clamp-2 leading-relaxed">
+                            {course.description_ru}
+                          </p>
+                        </div>
                       </div>
-                      <div className="bg-stone-50/50 rounded-2xl p-4 border border-stone-100/50">
-                        <p className="text-stone-600 text-sm line-clamp-2 leading-relaxed">
-                          {course.description_ru}
-                        </p>
-                      </div>
-                    </div>
+                    )}
                   </div>
 
                   <div className="px-8 pb-8 pt-4">

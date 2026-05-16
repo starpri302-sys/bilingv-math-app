@@ -29,6 +29,7 @@ interface Lecture {
   content_ru: string;
   content_tyv: string;
   item_type: 'theory' | 'test';
+  course_created_by?: string;
 }
 
 interface VisualBlock {
@@ -280,6 +281,40 @@ export default function LectureDetail() {
               </div>
             </header>
 
+            {/* Access Control Section for Teacher */}
+            {console.log('User:', user, 'Lecture:', lecture)}
+            {lecture.course_created_by === user?.id && (
+              <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-6 mb-8">
+                <h4 className="font-bold text-emerald-900 mb-4 flex items-center gap-2">
+                  <Lock className="w-5 h-5" />
+                  Управление доступом
+                </h4>
+                <div className="flex gap-2">
+                   <input 
+                     type="text"
+                     placeholder="ID ученика"
+                     id="userIdInput"
+                     className="flex-grow px-4 py-2 rounded-xl border border-emerald-200 outline-none focus:ring-2 focus:ring-emerald-500"
+                   />
+                   <button 
+                     onClick={async () => {
+                       const userId = (document.getElementById('userIdInput') as HTMLInputElement).value;
+                       if (!userId) return;
+                       try {
+                         await api.grantLectureAccess(id!, userId);
+                         alert('Доступ предоставлен');
+                       } catch (e) {
+                         alert('Ошибка доступа');
+                       }
+                     }}
+                     className="bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-emerald-700"
+                   >
+                     Дать доступ
+                   </button>
+                </div>
+              </div>
+            )}
+
             {lecture.item_type === 'test' ? (
               <div className="space-y-8">
                  {visualBlocks.map((block) => (
@@ -384,6 +419,13 @@ export default function LectureDetail() {
                            <iframe
                              className="w-full h-full"
                              src={`https://player.vimeo.com/video/${res.url.split('/').pop()}`}
+                             allowFullScreen
+                           />
+                         ) : res.url.includes('vk.com') ? (
+                           <iframe
+                             className="w-full h-full"
+                             src={res.url.includes('video_ext.php') ? res.url : res.url.replace('vk.com/video', 'vk.com/video_ext.php')}
+                             allow="autoplay; encrypted-media; fullscreen; picture-in-picture;"
                              allowFullScreen
                            />
                          ) : (

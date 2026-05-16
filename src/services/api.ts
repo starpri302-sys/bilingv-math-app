@@ -479,5 +479,20 @@ export const api = {
       headers: getAuthHeader()
     });
     return handleResponse(res);
+  },
+  async grantLectureAccess(lectureId: string, userId: string, expiresAt?: string) {
+    const res = await fetch(`/api/lectures/${lectureId}/access`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify({ userId, expiresAt })
+    });
+    return handleResponse(res);
+  },
+  async revokeLectureAccess(lectureId: string, userId: string) {
+    const res = await fetch(`/api/lectures/${lectureId}/access/${userId}`, {
+      method: 'DELETE',
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
   }
 };

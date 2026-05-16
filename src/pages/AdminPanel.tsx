@@ -35,7 +35,7 @@ export default function AdminPanel() {
   const [showForm, setShowForm] = useState(false);
   const [showTermEditor, setShowTermEditor] = useState(false);
   const [editingTerm, setEditingTerm] = useState<any>(null);
-  const [subjectForm, setSubjectForm] = useState({ id: '', slug: '', name_ru: '', name_tyv: '', icon: 'calculator' });
+  const [subjectForm, setSubjectForm] = useState({ id: '', slug: '', name_ru: '', name_tyv: '', icon: 'calculator', color: '#10b981' });
   const [langForm, setLangForm] = useState({ code: '', name: '', native_name: '', flag: '' });
 
   useEffect(() => {
@@ -198,9 +198,10 @@ export default function AdminPanel() {
       const id = subjectForm.id || Math.random().toString(36).substr(2, 9);
       await api.saveSubject({ ...subjectForm, id }, profile?.role);
       setShowForm(false);
-      setSubjectForm({ id: '', slug: '', name_ru: '', name_tyv: '', icon: 'calculator' });
+      setSubjectForm({ id: '', slug: '', name_ru: '', name_tyv: '', icon: 'calculator', color: '#10b981' });
       loadData();
     } catch (error) {
+      setAlertMessage({ isOpen: true, title: 'Ошибка', message: 'Не удалось сохранить предмет. Возможно, цвет занят.' });
       console.error('Error saving subject:', error);
     }
   };
@@ -437,6 +438,15 @@ export default function AdminPanel() {
                     onChange={e => setSubjectForm({ ...subjectForm, icon: e.target.value })}
                     className="p-3 rounded-xl border border-stone-200 outline-none focus:ring-2 focus:ring-emerald-500"
                   />
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-stone-500">Цвет темы:</label>
+                    <input
+                      type="color"
+                      value={subjectForm.color}
+                      onChange={e => setSubjectForm({ ...subjectForm, color: e.target.value })}
+                      className="h-12 w-full rounded-xl cursor-pointer"
+                    />
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <button type="submit" className="bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold">Сохранить</button>

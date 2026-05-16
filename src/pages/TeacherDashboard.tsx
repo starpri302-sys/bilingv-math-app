@@ -25,6 +25,7 @@ interface DashboardData {
 }
 
 export default function TeacherDashboard() {
+  console.log('TeacherDashboard component rendering');
   const navigate = useNavigate();
   const { user, isPro, isTeacher } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -44,7 +45,9 @@ export default function TeacherDashboard() {
 
     const fetchDashboard = async () => {
       try {
+        console.log('Fetching dashboard data...');
         const dashboardData = await api.getTeacherDashboard();
+        console.log('Received dashboard data:', dashboardData);
         setData(dashboardData);
       } catch (err) {
         console.error('Failed to fetch dashboard:', err);
@@ -82,6 +85,14 @@ export default function TeacherDashboard() {
     );
   }
 
+  if (!data) {
+    return (
+      <div className="text-center py-20 text-stone-500">
+        Не удалось загрузить данные панели управления. Попробуйте обновить страницу.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 pb-20">
       <SEO title="Хаб учителя - BilingvMath" />
@@ -115,10 +126,10 @@ export default function TeacherDashboard() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { label: 'Мои курсы', value: data?.courses?.length || 0, icon: Layers, color: 'bg-emerald-50 text-emerald-600' },
-          { label: 'Активные классы', value: data?.classes?.length || 0, icon: Users, color: 'bg-blue-50 text-blue-600' },
-          { label: 'Всего учеников', value: data?.stats?.total_students || 0, icon: GraduationCap, color: 'bg-purple-50 text-purple-600' },
-          { label: 'Назначения', value: data?.stats?.total_assignments || 0, icon: ClipboardList, color: 'bg-amber-50 text-amber-600' },
+          { label: 'Мои курсы', value: data.courses?.length || 0, icon: Layers, color: 'bg-emerald-50 text-emerald-600' },
+          { label: 'Активные классы', value: data.classes?.length || 0, icon: Users, color: 'bg-blue-50 text-blue-600' },
+          { label: 'Всего учеников', value: data.stats?.total_students || 0, icon: GraduationCap, color: 'bg-purple-50 text-purple-600' },
+          { label: 'Назначения', value: data.stats?.total_assignments || 0, icon: ClipboardList, color: 'bg-amber-50 text-amber-600' },
         ].map((stat, i) => (
           <motion.div
             key={i}
@@ -174,7 +185,7 @@ export default function TeacherDashboard() {
                  </div>
                  
                  <div className="space-y-6">
-                    {data?.recent_activity && data.recent_activity.length > 0 ? (
+                    {data.recent_activity && data.recent_activity.length > 0 ? (
                       data.recent_activity.map((activity: any) => (
                         <div key={activity.id} className="flex gap-4 items-start group">
                           <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-all">
@@ -233,7 +244,7 @@ export default function TeacherDashboard() {
 
           {activeTab === 'courses' && (
             <div className="space-y-4">
-               {(data?.courses || []).slice((coursesPage - 1) * ITEMS_PER_PAGE, coursesPage * ITEMS_PER_PAGE).map((course, idx) => (
+               {(data.courses || []).slice((coursesPage - 1) * ITEMS_PER_PAGE, coursesPage * ITEMS_PER_PAGE).map((course, idx) => (
                  <Link 
                   key={course.id} 
                   to={`/courses/${course.id}`}
@@ -253,14 +264,14 @@ export default function TeacherDashboard() {
                    </div>
                  </Link>
                ))}
-               {data?.courses && data.courses.length > ITEMS_PER_PAGE && (
+               {data.courses && data.courses.length > ITEMS_PER_PAGE && (
                   <Pagination 
                     currentPage={coursesPage}
                     totalPages={Math.ceil(data.courses.length / ITEMS_PER_PAGE)}
                     onPageChange={setCoursesPage}
                   />
                )}
-               {data?.courses.length === 0 && (
+               {data.courses.length === 0 && (
                  <div className="text-center py-20 bg-white rounded-[2rem] border border-dashed border-stone-200 text-stone-400">
                     Начните с создания вашего первого курса
                  </div>
@@ -271,7 +282,7 @@ export default function TeacherDashboard() {
           {activeTab === 'classes' && (
             <div className="space-y-8">
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {(data?.classes || []).slice((classesPage - 1) * ITEMS_PER_PAGE, classesPage * ITEMS_PER_PAGE).map((cls) => (
+                {(data.classes || []).slice((classesPage - 1) * ITEMS_PER_PAGE, classesPage * ITEMS_PER_PAGE).map((cls) => (
                  <div key={cls.id} className="bg-white p-8 rounded-[2rem] border border-stone-200 shadow-sm hover:shadow-md transition-all">
                     <div className="flex items-center justify-between mb-6">
                       <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
@@ -292,14 +303,14 @@ export default function TeacherDashboard() {
                  </div>
                ))}
                </div>
-               {data?.classes && data.classes.length > ITEMS_PER_PAGE && (
+               {data.classes && data.classes.length > ITEMS_PER_PAGE && (
                   <Pagination 
                     currentPage={classesPage}
                     totalPages={Math.ceil(data.classes.length / ITEMS_PER_PAGE)}
                     onPageChange={setClassesPage}
                   />
                )}
-               {data?.classes.length === 0 && (
+               {data.classes.length === 0 && (
                  <div className="md:col-span-2 text-center py-20 bg-white rounded-[2rem] border border-dashed border-stone-200 text-stone-400">
                     У вас пока нет активных классов
                  </div>
@@ -387,7 +398,7 @@ export default function TeacherDashboard() {
                    >
                      {isSubmitting ? 'Создание...' : 'Создать и получить код'}
                    </button>
-                </form>
+                 </form>
              </div>
            </motion.div>
         </div>
