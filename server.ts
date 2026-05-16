@@ -308,7 +308,8 @@ async function initDb(forceReinstall = false) {
         slug TEXT UNIQUE,
         name_ru TEXT,
         name_tyv TEXT,
-        icon TEXT
+        icon TEXT,
+        color TEXT
       );
 
       CREATE TABLE IF NOT EXISTS languages (
@@ -1000,6 +1001,41 @@ async function startServer() {
       res.json({ id, success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to create assignment" });
+    }
+  });
+
+  // +++ TEACHER DASHBOARD API +++
+  app.get("/api/teacher/dashboard", authenticateToken, requirePro, async (req, res) => {
+    try {
+      const userId = (req as any).user.id;
+      const [courses, classes, recentActivity, stats] = await Promise.all([
+        pool.query("SELECT * FROM courses WHERE created_by = $1 ORDER BY created_at DESC", [userId]),
+        pool.query("SELECT * FROM classes WHERE teacher_id = $1 ORDER BY created_at DESC", [userId]),
+        pool.query(`
+          SELECT lc.*, u.username, u.full_name, l.title_ru as lecture_title, c.title_ru as course_title
+          FROM lecture_completions lc
+          JOIN users u ON lc.user_id = u.id
+          JOIN lectures l ON lc.lecture_id = l.id
+          JOIN courses c ON l.course_id = c.id
+          WHERE c.created_by = $1
+          ORDER BY lc.completed_at DESC
+          LIMIT 10
+        `, [userId]),
+        pool.query(`
+          SELECT 
+            (SELECT COUNT(*) FROM class_enrollments ce JOIN classes cls ON ce.class_id = cls.id WHERE cls.teacher_id = $1) as total_students,
+            (SELECT COUNT(*) FROM assignments a JOIN classes cls ON a.class_id = cls.id WHERE cls.teacher_id = $1) as total_assignments
+        `, [userId])
+      ]);
+      res.json({
+        courses: courses.rows,
+        classes: classes.rows,
+        recent_activity: recentActivity.rows,
+        stats: stats.rows[0]
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Failed to fetch teacher dashboard" });
     }
   });
 
@@ -1761,20 +1797,24 @@ async function startServer() {
   });
 
   app.post("/api/subjects", async (req, res) => {
-    const { id, slug, name_ru, name_tyv, icon, user_role } = req.body;
+    const { id, slug, name_ru, name_tyv, icon, color, user_role } = req.body;
     if (user_role !== 'super_admin') {
       return res.status(403).json({ error: "Forbidden: Only Super-admin can manage subjects" });
     }
     try {
+      const colorCheck = await pool.query("SELECT * FROM subjects WHERE color = $1 AND id != $2", [color, id]);
+      if (colorCheck.rows.length > 0) return res.status(400).json({ error: "Color already in use" });
+
       await pool.query(`
-        INSERT INTO subjects (id, slug, name_ru, name_tyv, icon)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO subjects (id, slug, name_ru, name_tyv, icon, color)
+        VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT(id) DO UPDATE SET
           slug=EXCLUDED.slug,
           name_ru=EXCLUDED.name_ru,
           name_tyv=EXCLUDED.name_tyv,
-          icon=EXCLUDED.icon
-      `, [id, slug, name_ru, name_tyv, icon]);
+          icon=EXCLUDED.icon,
+          color=EXCLUDED.color
+      `, [id, slug, name_ru, name_tyv, icon, color]);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Internal server error" });
