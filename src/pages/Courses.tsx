@@ -83,8 +83,28 @@ export default function Courses() {
   const [newModule, setNewModule] = useState({ title_ru: '', title_tyv: '', order_index: 0 });
   const [inviteCode, setInviteCode] = useState('');
   const [joining, setJoining] = useState(false);
+  const [showAcademicModal, setShowAcademicModal] = useState(false);
+  const [academicForm, setAcademicForm] = useState({ full_name: '', school: '', position: '', subjects: '' });
 
   const { isPro, isTeacher, user, profile } = useAuth();
+
+  const handleAcademicSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await api.submitAcademicRequest(academicForm);
+      alert('Ваша заявка успешно отправлена и будет рассмотрена администратором.');
+      setShowAcademicModal(false);
+    } catch (err: any) {
+      alert(err.message || 'Ошибка отправки заявки');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleJoinClass = async () => {
     if (!inviteCode.trim() || !user) return;
@@ -105,15 +125,22 @@ export default function Courses() {
     setLoading(true);
     setCurrentPage(1);
     try {
-      const [coursesData, subjectsData, progressData] = await Promise.all([
+      const [coursesData, subjectsData] = await Promise.all([
         api.getCourses(),
-        api.getSubjects(),
-        user ? api.getUserProgress() : Promise.resolve([])
+        api.getSubjects()
       ]);
       setCourses(coursesData);
       setSubjects(subjectsData);
-      if (Array.isArray(progressData)) {
-        setUserProgress(progressData);
+      
+      if (user) {
+        try {
+          const progressData = await api.getUserProgress();
+          if (Array.isArray(progressData)) {
+            setUserProgress(progressData);
+          }
+        } catch (e) {
+          console.error('Failed to fetch user progress:', e);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch data:', err);
@@ -1095,11 +1122,85 @@ export default function Courses() {
                   и методическим материалам для углубленного изучения математики.
                 </p>
               </div>
-              <button className="flex-shrink-0 bg-white text-emerald-700 px-10 py-5 rounded-2xl font-black shadow-xl hover:bg-emerald-50 transition-all active:scale-95 uppercase tracking-widest text-sm">
-                Стать Pro
+              <button 
+                onClick={() => setShowAcademicModal(true)}
+                className="flex-shrink-0 bg-white text-emerald-700 px-10 py-5 rounded-2xl font-black shadow-xl hover:bg-emerald-50 transition-all active:scale-95 uppercase tracking-widest text-sm"
+              >
+                Получить доступ
               </button>
             </div>
           </motion.div>
+        )}
+
+        {showAcademicModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl relative"
+            >
+              <button 
+                onClick={() => setShowAcademicModal(false)}
+                className="absolute top-6 right-6 text-stone-400 hover:text-stone-900 transition-colors p-2"
+              >
+                <X className="w-6 h-6" />
+              </button>
+              <div className="p-8 sm:p-10">
+                <h2 className="text-3xl font-serif font-black text-stone-900 mb-2">Академический доступ</h2>
+                <p className="text-stone-500 mb-8 text-sm">Доступ предоставляется учителям базовых и партнерских школ.</p>
+                <form onSubmit={handleAcademicSubmit} className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">ФИО полностью</label>
+                    <input 
+                      required
+                      value={academicForm.full_name}
+                      onChange={(e) => setAcademicForm({ ...academicForm, full_name: e.target.value })}
+                      autoFocus
+                      className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-emerald-500/10"
+                      placeholder="Иванов Иван Иванович"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Школа / Учебное заведение</label>
+                    <input 
+                      required
+                      value={academicForm.school}
+                      onChange={(e) => setAcademicForm({ ...academicForm, school: e.target.value })}
+                      className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-emerald-500/10"
+                      placeholder="МБОУ СОШ №1 г. Кызыл"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Должность</label>
+                    <input 
+                      required
+                      value={academicForm.position}
+                      onChange={(e) => setAcademicForm({ ...academicForm, position: e.target.value })}
+                      className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-emerald-500/10"
+                      placeholder="Учитель математики, Завуч"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Предметы (для каких будете использовать)</label>
+                    <textarea 
+                      required
+                      value={academicForm.subjects}
+                      onChange={(e) => setAcademicForm({ ...academicForm, subjects: e.target.value })}
+                      className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 h-32 outline-none focus:ring-4 focus:ring-emerald-500/10"
+                      placeholder="Математика, Алгебра (7-9 классы)"
+                    />
+                  </div>
+                  <button 
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full bg-stone-900 text-white rounded-2xl py-5 font-black hover:bg-emerald-600 transition-all disabled:opacity-50 uppercase tracking-widest text-xs"
+                  >
+                    {isSubmitting ? 'Отправка...' : 'Отправить заявку'}
+                  </button>
+                </form>
+              </div>
+            </motion.div>
+          </div>
         )}
       </div>
     </div>

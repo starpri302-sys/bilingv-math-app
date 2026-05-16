@@ -9,6 +9,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../store/authContext';
+import { useSocket } from '../hooks/useSocket';
 import SEO from '../components/SEO';
 import Pagination from '../components/Pagination';
 
@@ -37,6 +38,26 @@ export default function TeacherDashboard() {
   const [coursesPage, setCoursesPage] = useState(1);
   const [classesPage, setClassesPage] = useState(1);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [favorites, setFavorites] = useState<any[]>([]);
+
+  // Setup WS connection
+  const socket = useSocket();
+
+  useEffect(() => {
+    if (socket && user) {
+      socket.emit('subscribe', { rooms: [`teacher-${user.id}`] });
+      
+      const handleNewNotification = (noti: any) => {
+        setNotifications((prev) => [noti, ...prev].slice(0, 10));
+      };
+
+      socket.on('new_notification', handleNewNotification);
+
+      return () => {
+        socket.off('new_notification', handleNewNotification);
+      };
+    }
+  }, [socket, user]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -48,12 +69,14 @@ export default function TeacherDashboard() {
     const fetchData = async () => {
       if (!user) return;
       try {
-        const [dashboardData, notificationsData] = await Promise.all([
+        const [dashboardData, notificationsData, favoritesData] = await Promise.all([
           api.getTeacherDashboard(),
-          api.getNotifications(user.id)
+          api.getNotifications(user.id),
+          api.getFavorites()
         ]);
         setData(dashboardData);
         setNotifications(notificationsData);
+        setFavorites(Array.isArray(favoritesData) ? favoritesData : []);
       } catch (err) {
         console.error('Failed to fetch data:', err);
       } finally {
@@ -219,7 +242,6 @@ export default function TeacherDashboard() {
                <div className="bg-white rounded-[2.5rem] border border-stone-200 p-8">
                  <div className="flex items-center justify-between mb-8">
                    <h3 className="text-xl font-serif font-black text-stone-900">Последняя активность</h3>
-                   <button className="text-xs font-black text-emerald-600 uppercase tracking-widest hover:underline">Смотреть всё</button>
                  </div>
                  
                  <div className="space-y-6">
@@ -251,30 +273,6 @@ export default function TeacherDashboard() {
                         </div>
                       </div>
                     )}
-                 </div>
-               </div>
-
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <div className="bg-emerald-900 rounded-[2rem] p-8 text-white relative overflow-hidden group">
-                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform" />
-                   <h4 className="text-xl font-serif font-black mb-4">База знаний</h4>
-                   <p className="text-emerald-100/70 text-sm mb-6 leading-relaxed">
-                     Изучите методические рекомендации по ведению уроков математики на двух языках.
-                   </p>
-                   <button className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">
-                     Перейти <ArrowRight className="w-4 h-4" />
-                   </button>
-                 </div>
-
-                 <div className="bg-amber-500 rounded-[2rem] p-8 text-white relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-black/10 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform" />
-                    <h4 className="text-xl font-serif font-black mb-4">Сообщество</h4>
-                    <p className="text-amber-50 text-sm mb-6 leading-relaxed">
-                      Общайтесь с коллегами и делитесь шаблонами своих лекций.
-                    </p>
-                    <button className="flex items-center gap-2 bg-black/10 hover:bg-black/20 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">
-                      Присоединиться <ArrowRight className="w-4 h-4" />
-                    </button>
                  </div>
                </div>
             </div>
@@ -336,7 +334,6 @@ export default function TeacherDashboard() {
                     
                     <div className="flex items-center justify-between pt-6 border-t border-stone-100">
                        <Link to={`/teacher/classes/${cls.id}`} className="text-[10px] font-black text-stone-900 uppercase tracking-widest hover:text-emerald-600 underline">Журнал</Link>
-                       <button className="text-[10px] font-black text-stone-400 uppercase tracking-widest hover:text-rose-600">Настройки</button>
                     </div>
                  </div>
                ))}
@@ -366,10 +363,16 @@ export default function TeacherDashboard() {
              </div>
              
              <div className="space-y-4">
-                {/* Bookmarked items go here */}
-                <div className="p-4 bg-stone-50 rounded-2xl text-stone-400 text-center italic text-sm">
-                  Здесь появятся материалы, которые вы отметили как избранные
-                </div>
+                {favorites.length > 0 ? favorites.map(fav => (
+                  <Link key={fav.id} to={`/terms/${fav.term_id}`} className="block p-4 bg-stone-50 rounded-2xl hover:bg-stone-100 transition-colors">
+                    <h4 className="font-bold text-stone-900">{fav.term_name_ru}</h4>
+                    <p className="text-xs text-stone-500 italic mt-1">{fav.term_name_tyv}</p>
+                  </Link>
+                )) : (
+                  <div className="p-4 bg-stone-50 rounded-2xl text-stone-400 text-center italic text-sm">
+                    Здесь появятся материалы, которые вы отметили как избранные
+                  </div>
+                )}
              </div>
            </div>
 
@@ -377,25 +380,22 @@ export default function TeacherDashboard() {
              <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.2),transparent)] opacity-0 group-hover:opacity-100 transition-opacity" />
              <h3 className="text-xl font-serif font-black mb-6 flex items-center gap-3">
                <ClipboardList className="w-5 h-5 text-emerald-400" />
-               План обучения
+               Быстрые действия
              </h3>
              <ul className="space-y-4 relative">
-               <li className="flex gap-3">
-                 <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                 <p className="text-stone-400 text-sm">Завершить модуль "Алгебра 10"</p>
+               <li className="flex gap-3 items-center">
+                 <div className="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                 <Link to="/courses" className="text-stone-400 text-sm hover:text-white transition-colors">Создать новый курс</Link>
                </li>
-               <li className="flex gap-3">
-                 <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                 <p className="text-stone-400 text-sm">Назначить тест для 11-Б класса</p>
+               <li className="flex gap-3 items-center">
+                 <div className="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                 <button onClick={() => setShowCreateClass(true)} className="text-stone-400 text-sm hover:text-white transition-colors">Создать новый класс</button>
                </li>
-               <li className="flex gap-3">
-                 <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-stone-600 shrink-0" />
-                 <p className="text-stone-500 text-sm italic">Подготовить материалы к ЕГЭ</p>
+               <li className="flex gap-3 items-center">
+                 <div className="mt-1 w-1.5 h-1.5 rounded-full bg-stone-600 shrink-0" />
+                 <Link to="/admin" className="text-stone-500 text-sm hover:text-stone-300 transition-colors">Перейти в словарь (Все термины)</Link>
                </li>
              </ul>
-             <button className="w-full mt-8 bg-white/10 hover:bg-white/20 text-white rounded-xl py-4 font-black uppercase tracking-widest text-[10px] transition-colors">
-               Редактировать план
-             </button>
            </div>
         </div>
       </div>

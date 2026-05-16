@@ -57,6 +57,28 @@ export const api = {
     const res = await fetch('/api/admin/users');
     return handleResponse(res);
   },
+  async getAcademicRequests(userRole: string) {
+    const res = await fetch(`/api/academic-requests?user_role=${userRole}`, {
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
+  async submitAcademicRequest(data: { full_name: string, school: string, position: string, subjects: string }) {
+    const res = await fetch('/api/academic-requests', {
+      method: 'POST',
+      headers: getAuthHeader(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+  async updateAcademicRequestStatus(id: string, status: 'approved' | 'rejected', userRole: string) {
+    const res = await fetch(`/api/academic-requests/${id}/status`, {
+      method: 'PATCH',
+      headers: getAuthHeader(),
+      body: JSON.stringify({ status, user_role: userRole })
+    });
+    return handleResponse(res);
+  },
   async resetUserPassword(userId: string, adminRole: string) {
     const res = await fetch(`/api/admin/users/${userId}/reset-password`, {
       method: 'POST',

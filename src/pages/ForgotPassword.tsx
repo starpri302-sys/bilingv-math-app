@@ -18,6 +18,7 @@ export default function ForgotPassword() {
       const res = await api.forgotPassword(email);
       if (res.success) {
         setSuccess(true);
+        setMessage(res.message);
       } else {
         setMessage(`Ошибка: ${res.error || 'Не удалось отправить запрос'}`);
       }
@@ -42,7 +43,7 @@ export default function ForgotPassword() {
           </div>
           <h1 className="text-3xl font-serif font-black text-stone-900">Запрос отправлен</h1>
           <p className="text-stone-600 font-medium">
-            Если аккаунт с email <strong>{email}</strong> существует, вы получите инструкции по сбросу пароля.
+            {message || `Если аккаунт с email ${email} существует, на него будет отправлен новый пароль.`}
           </p>
           <div className="pt-6">
             <Link

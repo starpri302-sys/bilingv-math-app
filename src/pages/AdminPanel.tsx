@@ -7,12 +7,13 @@ import ConfirmModal from '../components/ConfirmModal';
 import { motion, AnimatePresence } from 'motion/react';
 import { Shield, CheckCircle, Trash2, Clock, Info, Plus, Languages, Book, Calculator, Settings, Edit3, Terminal, Download, Database as DbIcon, Upload, FileJson, X, Key } from 'lucide-react';
 
-type AdminTab = 'moderation' | 'subjects' | 'languages' | 'users' | 'system';
+type AdminTab = 'moderation' | 'subjects' | 'languages' | 'users' | 'system' | 'requests';
 
 export default function AdminPanel() {
   const { isAdmin, isSuperAdmin, isChiefEditor, profile, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>('moderation');
   const [pendingTerms, setPendingTerms] = useState<any[]>([]);
+  const [academicRequests, setAcademicRequests] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [languages, setLanguages] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -62,6 +63,9 @@ export default function AdminPanel() {
       } else if (activeTab === 'system' && isSuperAdmin) {
         const data = await api.getAdminLogs(profile?.role || '');
         setLogs(data);
+      } else if (activeTab === 'requests' && isSuperAdmin) {
+        const data = await api.getAcademicRequests(profile?.role || '');
+        setAcademicRequests(data);
       }
     } catch (error) {
       console.error('Error loading admin data:', error);
@@ -250,6 +254,7 @@ export default function AdminPanel() {
 
   const tabs = [
     { id: 'moderation', label: 'Модерация', icon: Clock, visible: true },
+    { id: 'requests', label: 'Академические запросы', icon: Book, visible: isSuperAdmin },
     { id: 'subjects', label: 'Предметы', icon: Calculator, visible: isSuperAdmin },
     { id: 'languages', label: 'Языки', icon: Languages, visible: isSuperAdmin },
     { id: 'users', label: 'Пользователи', icon: Shield, visible: isSuperAdmin },
@@ -604,6 +609,58 @@ export default function AdminPanel() {
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'requests' && isSuperAdmin && (
+          <div className="space-y-6">
+            <h2 className="text-xl font-bold text-stone-900">Запросы на академический доступ ({academicRequests.length})</h2>
+            <div className="space-y-4">
+              {academicRequests.length > 0 ? academicRequests.map(r => (
+                <div key={r.id} className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-bold text-stone-900 mb-1">{r.full_name} <span className="font-normal text-stone-400 text-sm">(@{r.username})</span></h3>
+                    <p className="text-sm text-stone-600 mb-1"><span className="font-bold">Школа:</span> {r.school}</p>
+                    <p className="text-sm text-stone-600 mb-1"><span className="font-bold">Должность:</span> {r.position}</p>
+                    <p className="text-sm text-stone-600 mb-2"><span className="font-bold">Предметы:</span> {r.subjects}</p>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${r.status === 'pending' ? 'bg-amber-100 text-amber-700' : r.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                      {r.status === 'pending' ? 'На рассмотрении' : r.status === 'approved' ? 'Одобрено' : 'Отклонено'}
+                    </span>
+                  </div>
+                  {r.status === 'pending' && (
+                    <div className="flex items-center gap-2">
+                       <button
+                         onClick={async () => {
+                           if (!window.confirm('Одобрить доступ? (Даст статус Pro)')) return;
+                           await api.updateAcademicRequestStatus(r.id, 'approved', profile?.role || '');
+                           const data = await api.getAcademicRequests(profile?.role || '');
+                           setAcademicRequests(data);
+                         }}
+                         className="px-4 py-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 rounded-xl font-bold transition-all text-sm"
+                       >
+                         Одобрить
+                       </button>
+                       <button
+                         onClick={async () => {
+                           if (!window.confirm('Отклонить запрос?')) return;
+                           await api.updateAcademicRequestStatus(r.id, 'rejected', profile?.role || '');
+                           const data = await api.getAcademicRequests(profile?.role || '');
+                           setAcademicRequests(data);
+                         }}
+                         className="px-4 py-2 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 rounded-xl font-bold transition-all text-sm"
+                       >
+                         Отклонить
+                       </button>
+                    </div>
+                  )}
+                </div>
+              )) : (
+                <div className="text-center py-10 bg-stone-50 rounded-3xl border border-dashed border-stone-200">
+                   <Book className="w-8 h-8 text-stone-300 mx-auto mb-2" />
+                   <p className="text-stone-500 font-medium">Новых запросов нет.</p>
+                </div>
+              )}
             </div>
           </div>
         )}

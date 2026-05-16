@@ -4,10 +4,11 @@ import { motion } from 'motion/react';
 import { 
   Users, Calendar, ChevronLeft, GraduationCap, 
   Search, Mail, MoreVertical, ClipboardList,
-  Plus, Clock, CheckCircle2, AlertCircle, FileText, BarChart3
+  Plus, Clock, CheckCircle2, AlertCircle, FileText, BarChart3, X
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../store/authContext';
+import { useSocket } from '../hooks/useSocket';
 import SEO from '../components/SEO';
 import Pagination from '../components/Pagination';
 
@@ -54,6 +55,62 @@ export default function ClassDetail() {
   const [activeTab, setActiveTab] = useState<'students' | 'assignments' | 'progress'>('students');
   const [studentPage, setStudentPage] = useState(1);
   const [assignmentPage, setAssignmentPage] = useState(1);
+  
+  // Assignment Modal
+  const [showCreateAssignment, setShowCreateAssignment] = useState(false);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [lectures, setLectures] = useState<any[]>([]);
+  const [assignmentForm, setAssignmentForm] = useState({ course_id: '', lecture_id: '', due_date: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const socket = useSocket();
+
+  useEffect(() => {
+    if (socket && id) {
+      socket.emit('subscribe', { rooms: [`class-${id}`] });
+      
+      const handleProgressUpdate = async (data: any) => {
+        // Re-fetch progress to stay in sync
+        try {
+          const progressData = await api.getClassProgress(id);
+          setProgress(progressData);
+        } catch(e) {}
+      };
+
+      socket.on('assignment_progress_update', handleProgressUpdate);
+      return () => {
+        socket.off('assignment_progress_update', handleProgressUpdate);
+      };
+    }
+  }, [socket, id]);
+
+  const handleExportCSV = () => {
+    // 1. Prepare data
+    const header = ['Ученик', 'Лекция', 'Баллы', 'Макс. Балл', 'Дата сдачи'];
+    const rows = progress.map(p => [
+      p.full_name || p.username,
+      p.lecture_title,
+      p.score,
+      p.max_score,
+      new Date(p.completed_at).toLocaleString()
+    ]);
+    
+    // 2. Build CSV string
+    const csvContent = [
+      header.join(','),
+      ...rows.map(e => e.join(','))
+    ].join('\\n');
+    
+    // 3. Trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `class_${id}_progress.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   useEffect(() => {
     if (!isTeacher && !isPro) {
@@ -66,14 +123,16 @@ export default function ClassDetail() {
       setStudentPage(1);
       setAssignmentPage(1);
       try {
-        const [studentsData, assignmentsData, progressData] = await Promise.all([
+        const [studentsData, assignmentsData, progressData, coursesData] = await Promise.all([
           api.getClassStudents(id!),
           api.getClassAssignments(id!),
-          api.getClassProgress(id!)
+          api.getClassProgress(id!),
+          api.getCourses()
         ]);
         setStudents(studentsData);
         setAssignments(assignmentsData);
         setProgress(progressData);
+        setCourses(coursesData);
       } catch (err) {
         console.error('Failed to fetch class data:', err);
       } finally {
@@ -83,6 +142,36 @@ export default function ClassDetail() {
 
     fetchData();
   }, [id, isTeacher, isPro, navigate]);
+
+  const loadLectures = async (courseId: string) => {
+    try {
+      const data = await api.getCourseLectures(courseId);
+      setLectures(data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleCreateAssignment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignmentForm.lecture_id || !assignmentForm.due_date) return;
+    setIsSubmitting(true);
+    try {
+      await api.createAssignment(id!, { lecture_id: assignmentForm.lecture_id, due_date: assignmentForm.due_date });
+      setShowCreateAssignment(false);
+      setAssignmentForm({ course_id: '', lecture_id: '', due_date: '' });
+      const [assignmentsData, progressData] = await Promise.all([
+        api.getClassAssignments(id!),
+        api.getClassProgress(id!)
+      ]);
+      setAssignments(assignmentsData);
+      setProgress(progressData);
+    } catch (err) {
+      console.error('Failed to create assignment:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -113,6 +202,13 @@ export default function ClassDetail() {
           <h1 className="text-3xl font-serif font-black text-stone-900 mb-2">Журнал успеваемости</h1>
           <p className="text-stone-500 font-medium">Мониторинг активности и успеваемости студентов.</p>
         </div>
+        <button 
+          onClick={handleExportCSV}
+          className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-3 rounded-xl hover:bg-emerald-700 transition-colors font-bold uppercase tracking-widest text-[10px]"
+        >
+          <FileText className="w-4 h-4" />
+          Экспорт CSV
+        </button>
       </div>
 
       {/* Tabs */}
@@ -150,7 +246,6 @@ export default function ClassDetail() {
                   <th className="px-8 py-6 text-[10px] font-black text-stone-400 uppercase tracking-widest">Класс/Год</th>
                   <th className="px-8 py-6 text-[10px] font-black text-stone-400 uppercase tracking-widest">Прогресс</th>
                   <th className="px-8 py-6 text-[10px] font-black text-stone-400 uppercase tracking-widest">Дата вступления</th>
-                  <th className="px-8 py-6"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-50">
@@ -197,11 +292,6 @@ export default function ClassDetail() {
                         </td>
                         <td className="px-8 py-5">
                           <span className="text-sm text-stone-500">{new Date(student.enrolled_at).toLocaleDateString()}</span>
-                        </td>
-                        <td className="px-8 py-5 text-right">
-                          <button className="text-stone-300 hover:text-stone-600 transition-colors">
-                            <MoreVertical className="w-5 h-5" />
-                          </button>
                         </td>
                       </tr>
                     );
@@ -289,15 +379,16 @@ export default function ClassDetail() {
                 
                 <div className="flex items-center justify-between pt-6 border-t border-stone-100">
                   <Link to={`/lectures/${assignment.lecture_id}`} className="text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:underline">Просмотр материала</Link>
-                  <div className="flex -space-x-2">
-                     {/* Progress dots or similar could go here */}
-                     <div className="w-6 h-6 rounded-full bg-emerald-500 border-2 border-white" />
-                     <div className="w-6 h-6 rounded-full bg-stone-200 border-2 border-white" />
+                  <div className="text-[10px] font-black text-stone-500 uppercase tracking-widest">
+                    Пройдено: {progress.filter(p => p.lecture_id === assignment.lecture_id).length} / {students.length}
                   </div>
                 </div>
               </div>
             ))}
-            <button className="flex flex-col items-center justify-center p-8 rounded-[2rem] border-2 border-dashed border-stone-200 text-stone-400 hover:border-emerald-600 hover:text-emerald-600 transition-all group">
+            <button 
+              onClick={() => setShowCreateAssignment(true)}
+              className="flex flex-col items-center justify-center p-8 rounded-[2rem] border-2 border-dashed border-stone-200 text-stone-400 hover:border-emerald-600 hover:text-emerald-600 transition-all group"
+            >
                <Plus className="w-8 h-8 mb-4 group-hover:scale-110 transition-transform" />
                <span className="font-black uppercase tracking-widest text-xs">Добавить задание</span>
             </button>
@@ -309,6 +400,83 @@ export default function ClassDetail() {
               onPageChange={setAssignmentPage}
             />
           )}
+        </div>
+      )}
+
+      {/* Create Assignment Modal */}
+      {showCreateAssignment && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-md">
+           <motion.div 
+             initial={{ opacity: 0, scale: 0.95 }}
+             animate={{ opacity: 1, scale: 1 }}
+             className="bg-white rounded-[2.5rem] w-full max-w-md overflow-hidden shadow-2xl relative"
+           >
+             <button 
+               onClick={() => setShowCreateAssignment(false)}
+               className="absolute top-6 right-6 text-stone-400 hover:text-stone-900 transition-colors p-2"
+             >
+               <X className="w-6 h-6" />
+             </button>
+             
+             <div className="p-10">
+                <h2 className="text-2xl font-serif font-black text-stone-900 mb-6">Новое задание</h2>
+                <form onSubmit={handleCreateAssignment} className="space-y-6">
+                   <div className="space-y-2">
+                     <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Курс</label>
+                     <select 
+                       required
+                       value={assignmentForm.course_id}
+                       onChange={(e) => {
+                         setAssignmentForm(prev => ({ ...prev, course_id: e.target.value, lecture_id: '' }));
+                         if (e.target.value) loadLectures(e.target.value);
+                       }}
+                       className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-emerald-500/10 font-bold text-sm"
+                     >
+                       <option value="">Выберите курс</option>
+                       {courses.map(c => (
+                         <option key={c.id} value={c.id}>{c.title_ru}</option>
+                       ))}
+                     </select>
+                   </div>
+                   
+                   <div className="space-y-2">
+                     <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Лекция</label>
+                     <select 
+                       required
+                       disabled={!assignmentForm.course_id}
+                       value={assignmentForm.lecture_id}
+                       onChange={(e) => setAssignmentForm({ ...assignmentForm, lecture_id: e.target.value })}
+                       className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-emerald-500/10 font-bold text-sm disabled:opacity-50"
+                     >
+                       <option value="">Выберите лекцию</option>
+                       {lectures.map(l => (
+                         <option key={l.id} value={l.id}>{l.title_ru}</option>
+                       ))}
+                     </select>
+                   </div>
+
+                   <div className="space-y-2">
+                     <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Крайний срок (Дата)</label>
+                     <input 
+                       type="date"
+                       required
+                       min={new Date().toISOString().split('T')[0]}
+                       value={assignmentForm.due_date}
+                       onChange={(e) => setAssignmentForm({ ...assignmentForm, due_date: e.target.value })}
+                       className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-emerald-500/10 font-bold text-sm"
+                     />
+                   </div>
+
+                   <button 
+                     type="submit"
+                     disabled={isSubmitting || !assignmentForm.lecture_id}
+                     className="w-full bg-emerald-600 text-white rounded-2xl py-5 font-black shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all uppercase tracking-widest text-xs disabled:opacity-50"
+                   >
+                     {isSubmitting ? 'Назначение...' : 'Назначить классу'}
+                   </button>
+                 </form>
+             </div>
+           </motion.div>
         </div>
       )}
     </div>

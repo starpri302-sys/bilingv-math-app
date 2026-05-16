@@ -176,7 +176,7 @@ export default function Register() {
             />
             <label htmlFor="consent" className="text-[10px] text-stone-500 font-medium leading-relaxed">
               Я соглашаюсь на обработку моих персональных данных в соответствии с ФЗ-152 РФ и принимаю условия{' '}
-              <a href="#" className="text-emerald-600 hover:underline">Пользовательского соглашения</a>.
+              <Link to="/terms" className="text-emerald-600 hover:underline">Пользовательского соглашения</Link>.
             </label>
           </div>
 

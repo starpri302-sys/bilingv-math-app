@@ -13,6 +13,7 @@ import nodemailer from 'nodemailer';
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import pool from "./db";
+import crypto from "crypto";
 
 dotenv.config();
 
@@ -315,6 +316,7 @@ async function initDb(forceReinstall = false) {
 
     try { await client.exec(`ALTER TABLE lectures ADD COLUMN visibility TEXT DEFAULT 'public'`); } catch (e) {}
     try { await client.exec(`ALTER TABLE lectures ADD COLUMN access_type TEXT DEFAULT 'free'`); } catch (e) {}
+    try { await client.exec(`ALTER TABLE subjects ADD COLUMN color TEXT DEFAULT '#10b981'`); } catch (e) {}
 
     await client.exec(`
       CREATE TABLE IF NOT EXISTS lecture_access (
@@ -403,8 +405,21 @@ async function initDb(forceReinstall = false) {
         is_read INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS academic_requests (
+        id TEXT PRIMARY KEY,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        full_name TEXT NOT NULL,
+        school TEXT NOT NULL,
+        position TEXT,
+        subjects TEXT NOT NULL,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
     console.log("All tables created successfully.");
+
+    try { await client.exec(`ALTER TABLE academic_requests ADD COLUMN position TEXT`); } catch (e) {}
 
     // Seed initial subjects and languages if empty
     const langCountRes = await client.query("SELECT COUNT(*) as count FROM languages");
@@ -562,7 +577,7 @@ async function startServer() {
   app.get("/api/courses/:id/lectures", async (req, res) => {
     try {
       const lecturesRes = await pool.query(
-        "SELECT id, title_ru, title_tyv, order_index, is_free FROM lectures WHERE course_id = $1 ORDER BY order_index ASC",
+        "SELECT id, module_id, title_ru, title_tyv, item_type, order_index, is_free FROM lectures WHERE course_id = $1 ORDER BY order_index ASC",
         [req.params.id]
       );
       res.json(lecturesRes.rows);
@@ -718,12 +733,12 @@ async function startServer() {
 
   // +++ EDUCATIONAL COURSES & LECTURES API (MANAGEMENT) +++
   app.post("/api/courses", authenticateToken, requirePro, async (req, res) => {
-    const { subject_id, title_ru, title_tyv, description_ru, description_tyv } = req.body;
+    const { subject_id, title_ru, title_tyv, description_ru, description_tyv, image_url } = req.body;
     const id = Math.random().toString(36).substr(2, 9);
     try {
       await pool.query(
-        "INSERT INTO courses (id, subject_id, title_ru, title_tyv, description_ru, description_tyv, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-        [id, subject_id, title_ru, title_tyv, description_ru, description_tyv, (req as any).user.id]
+        "INSERT INTO courses (id, subject_id, title_ru, title_tyv, description_ru, description_tyv, image_url, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        [id, subject_id, title_ru, title_tyv, description_ru, description_tyv, image_url, (req as any).user.id]
       );
       res.json({ id, success: true });
     } catch (error) {
@@ -732,11 +747,11 @@ async function startServer() {
   });
 
   app.put("/api/courses/:id", authenticateToken, requirePro, async (req, res) => {
-    const { subject_id, title_ru, title_tyv, description_ru, description_tyv } = req.body;
+    const { subject_id, title_ru, title_tyv, description_ru, description_tyv, image_url } = req.body;
     try {
       await pool.query(
-        "UPDATE courses SET subject_id = $1, title_ru = $2, title_tyv = $3, description_ru = $4, description_tyv = $5 WHERE id = $6",
-        [subject_id, title_ru, title_tyv, description_ru, description_tyv, req.params.id]
+        "UPDATE courses SET subject_id = $1, title_ru = $2, title_tyv = $3, description_ru = $4, description_tyv = $5, image_url = $6 WHERE id = $7",
+        [subject_id, title_ru, title_tyv, description_ru, description_tyv, image_url, req.params.id]
       );
       res.json({ success: true });
     } catch (error) {
@@ -1037,7 +1052,7 @@ async function startServer() {
       );
 
       const assignmentInfo = await pool.query(`
-        SELECT a.id, c.teacher_id, l.title_ru as lecture_title
+        SELECT a.id, a.class_id, c.teacher_id, l.title_ru as lecture_title
         FROM assignments a
         JOIN classes c ON a.class_id = c.id
         JOIN lectures l ON a.lecture_id = l.id
@@ -1045,12 +1060,32 @@ async function startServer() {
       `, [assignmentId]);
 
       if (assignmentInfo.rows.length > 0) {
-        const { teacher_id, lecture_title } = assignmentInfo.rows[0];
+        const { teacher_id, lecture_title, class_id } = assignmentInfo.rows[0];
         const notificationId = Math.random().toString(36).substr(2, 9);
+        
+        const userQuery = await pool.query("SELECT username, full_name FROM users WHERE id = $1", [userId]);
+        const userName = userQuery.rows[0]?.full_name || userQuery.rows[0]?.username || 'Студент';
+        
         await pool.query(
           "INSERT INTO notifications (id, user_id, type, message) VALUES ($1, $2, $3, $4)",
-          [notificationId, teacher_id, 'assignment_submitted', `Студент сдал задание: "${lecture_title}"`]
+          [notificationId, teacher_id, 'assignment_submitted', `${userName} сдал(а) задание: "${lecture_title}"`]
         );
+        
+        // Emit real-time notification to teacher dashboard
+        io.to(`teacher-${teacher_id}`).emit('new_notification', {
+           id: notificationId,
+           type: 'assignment_submitted',
+           message: `${userName} сдал(а) задание: "${lecture_title}"`,
+           created_at: new Date()
+        });
+
+        // Emit real-time progress update to class detail view
+        io.to(`class-${class_id}`).emit('assignment_progress_update', {
+           assignment_id: assignmentId,
+           user_id: userId,
+           status: 'submitted',
+           lecture_id: (assignmentInfo.rows[0] as any).lecture_id
+        });
       }
 
       res.json({ success: true });
@@ -1407,39 +1442,30 @@ async function startServer() {
         return res.status(404).json({ error: "Пользователь с таким email не найден" });
       }
 
-      const token = Math.random().toString(36).substr(2, 12);
-      const expires = new Date(Date.now() + 3600000).toISOString();
+      // Generate a random 8-character password
+      const newPassword = Math.random().toString(36).slice(-8);
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-      await pool.query(`
-        INSERT INTO password_resets (email, token, expires) 
-        VALUES ($1, $2, $3)
-        ON CONFLICT (email) DO UPDATE SET token = EXCLUDED.token, expires = EXCLUDED.expires
-      `, [email, token, expires]);
+      await pool.query("UPDATE users SET password = $1 WHERE email = $2", [hashedPassword, email]);
 
-      const resetUrl = `${process.env.APP_URL || 'http://localhost:3000'}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
-      
-      console.log(`PASSWORD RESET TOKEN FOR ${email}: ${token}`);
-      console.log(`RESET URL: ${resetUrl}`);
+      console.log(`NEW RANDOMLY GENERATED PASSWORD FOR ${email}: ${newPassword}`);
 
       if (process.env.SMTP_USER && process.env.SMTP_PASS) {
         try {
           const mailOptions = {
             from: process.env.SMTP_FROM || '"Bilingual Math" <taskforcedefy12@mail.ru>',
             to: email,
-            subject: "Сброс пароля - Bilingual Math",
+            subject: "Восстановление доступа - Bilingual Math",
             html: `
               <div style="font-family: sans-serif; padding: 20px; color: #333; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 10px;">
-                <h2 style="color: #10b981;">Сброс пароля</h2>
-                <p>Вы получили это письмо, потому что вы (или кто-то другой) запросили сброс пароля для вашего аккаунта на сайте <b>Bilingual Math</b>.</p>
-                <p>Пожалуйста, нажмите на кнопку ниже, чтобы установить новый пароль:</p>
+                <h2 style="color: #10b981;">Новый пароль</h2>
+                <p>Вы получили это письмо, потому что запросили восстановление доступа к вашему аккаунту на сайте <b>Bilingual Math</b>.</p>
+                <p>Ваш новый случайно сгенерированный пароль для входа:</p>
                 <div style="text-align: center; margin: 30px 0;">
-                  <a href="${resetUrl}" style="display: inline-block; padding: 12px 24px; background-color: #10b981; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">Сбросить пароль</a>
+                  <span style="display: inline-block; padding: 12px 24px; background-color: #f3f4f6; color: #111827; border-radius: 8px; font-weight: bold; font-family: monospace; font-size: 24px; letter-spacing: 2px;">${newPassword}</span>
                 </div>
-                <p>Если кнопка не работает, скопируйте и вставьте эту ссылку в браузер:</p>
-                <p style="word-break: break-all; color: #666; font-size: 14px;">${resetUrl}</p>
-                <p>Если вы не запрашивали сброс, просто проигнорируйте это письмо. Ваш пароль останется прежним.</p>
-                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-                <p style="font-size: 0.8em; color: #999; text-align: center;">Эта ссылка действительна в течение 1 часа.</p>
+                <p>Используйте этот пароль для входа в систему. Вы можете изменить его позже в настройках вашего профиля.</p>
+                <p>Если вы не запрашивали восстановление пароля, рекомендуем как можно скорее войти и сменить этот пароль.</p>
               </div>
             `,
           };
@@ -1447,19 +1473,17 @@ async function startServer() {
           await sendEmailWithFallback(mailOptions);
           
           console.log(`Email successfully sent to ${email}`);
-          return res.json({ success: true, message: "Инструкции по сбросу пароля отправлены на ваш email" });
+          return res.json({ success: true, message: "Новый пароль отправлен на ваш email" });
         } catch (mailError: any) {
           console.error("Failed to send email:", mailError);
-          // Even if email fails, we return success in some cases to prevent email enumeration, 
-          // but here we want to help the user debug.
           return res.status(500).json({ 
-            error: "Ошибка при отправке письма. Пожалуйста, проверьте настройки SMTP или попробуйте позже.",
+            error: "Ошибка при отправке письма. Пожалуйста, проверьте настройки SMTP.",
             details: mailError.message 
           });
         }
       } else {
-        console.log("SMTP not configured, but token generated.");
-        return res.json({ success: true, message: "Токен сброса сгенерирован (SMTP не настроен). Проверьте консоль сервера." });
+        console.log("SMTP not configured, but new password generated.");
+        return res.json({ success: true, message: `Новый пароль сгенерирован: ${newPassword} (SMTP не настроен)` });
       }
     } catch (error) {
       console.error("Forgot password error:", error);
@@ -2414,12 +2438,88 @@ async function startServer() {
   // Socket.IO Logic
   io.on("connection", (socket) => {
     socket.on("subscribe", (data) => {
-      socket.join(`grade-${data.grade}`);
+      if (data.grade) socket.join(`grade-${data.grade}`);
+      if (data.rooms && Array.isArray(data.rooms)) {
+        data.rooms.forEach((room: string) => socket.join(room));
+      }
     });
 
     socket.on("typing", (data) => {
       socket.to(`term-${data.termId}`).emit("user:typing", data);
     });
+  });
+
+  // +++ ACADEMIC REQUESTS API +++
+  app.post("/api/academic-requests", authenticateToken, async (req, res) => {
+    try {
+      const userId = (req as any).user.id;
+      const { full_name, school, position, subjects } = req.body;
+      if (!full_name || !school || !subjects || !position) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      const existing = await pool.query("SELECT * FROM academic_requests WHERE user_id = $1 AND status = 'pending'", [userId]);
+      if (existing.rows.length > 0) {
+        return res.status(400).json({ error: "У вас уже есть заявка на рассмотрении." });
+      }
+      const requestId = crypto.randomUUID();
+      await pool.query(
+        "INSERT INTO academic_requests (id, user_id, full_name, school, position, subjects) VALUES ($1, $2, $3, $4, $5, $6)",
+        [requestId, userId, full_name, school, position, subjects]
+      );
+      res.json({ message: "Заявка успешно отправлена" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Failed to create request" });
+    }
+  });
+
+  app.get("/api/academic-requests", authenticateToken, async (req, res) => {
+    try {
+      const userRole = (req as any).query.user_role;
+      if (userRole !== 'super_admin') {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const requests = await pool.query(`
+        SELECT ar.*, u.email as user_email, u.username 
+        FROM academic_requests ar 
+        JOIN users u ON ar.user_id = u.id 
+        ORDER BY ar.created_at DESC
+      `);
+      res.json(requests.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch requests" });
+    }
+  });
+
+  app.patch("/api/academic-requests/:id/status", authenticateToken, async (req, res) => {
+    try {
+      if ((req as any).body.user_role !== 'super_admin') {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const { status } = req.body;
+      const reqId = req.params.id;
+      
+      const requestRes = await pool.query("UPDATE academic_requests SET status = $1 WHERE id = $2 RETURNING *", [status, reqId]);
+      if (requestRes.rows.length === 0) return res.status(404).json({ error: "Not found" });
+      
+      if (status === 'approved') {
+        await pool.query("UPDATE users SET subscription_tier = 'pro', role = 'teacher' WHERE id = $1", [requestRes.rows[0].user_id]);
+        
+        try {
+          const notifId = crypto.randomUUID();
+          await pool.query(
+            "INSERT INTO notifications (id, user_id, message) VALUES ($1, $2, $3)",
+            [notifId, requestRes.rows[0].user_id, "Ваша заявка на Академический доступ одобрена. Теперь у вас есть доступ к функциям преподавателя!"]
+          );
+        } catch (e) {
+          console.error("Failed to insert notification", e);
+        }
+      }
+      
+      res.json(requestRes.rows[0]);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update request" });
+    }
   });
 
   // 404 handler for API routes
