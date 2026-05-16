@@ -210,10 +210,6 @@ export const api = {
     const res = await fetch(`/api/admin/logs?user_role=${userRole}`);
     return handleResponse(res);
   },
-  async getNotifications(userId: string) {
-    const res = await fetch(`/api/notifications/${userId}`);
-    return handleResponse(res);
-  },
   async markNotificationRead(id: string) {
     const res = await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
     return handleResponse(res);

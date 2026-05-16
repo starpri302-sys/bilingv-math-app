@@ -396,7 +396,7 @@ export default function AdminPanel() {
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-bold text-stone-900">Список предметов</h2>
               <button
-                onClick={() => { setShowForm(true); setSubjectForm({ id: '', slug: '', name_ru: '', name_tyv: '', icon: 'calculator' }); }}
+                onClick={() => { setShowForm(true); setSubjectForm({ id: '', slug: '', name_ru: '', name_tyv: '', icon: 'calculator', color: '#10b981' }); }}
                 className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-all font-bold text-sm"
               >
                 <Plus className="w-4 h-4" />

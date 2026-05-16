@@ -46,10 +46,11 @@ export default function TeacherDashboard() {
     }
 
     const fetchData = async () => {
+      if (!user) return;
       try {
         const [dashboardData, notificationsData] = await Promise.all([
           api.getTeacherDashboard(),
-          api.getNotifications(user!.id)
+          api.getNotifications(user.id)
         ]);
         setData(dashboardData);
         setNotifications(notificationsData);
@@ -92,7 +93,13 @@ export default function TeacherDashboard() {
   if (!data) {
     return (
       <div className="text-center py-20 text-stone-500">
-        Не удалось загрузить данные панели управления. Попробуйте обновить страницу.
+        <p className="mb-4">Не удалось загрузить данные панели управления.</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="bg-emerald-600 text-white px-6 py-2 rounded-xl"
+        >
+          Обновить страницу
+        </button>
       </div>
     );
   }

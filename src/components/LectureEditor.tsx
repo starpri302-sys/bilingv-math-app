@@ -53,6 +53,8 @@ export default function LectureEditor({
   initialIsFree = true,
   initialQuiz = null,
   initialResources = [],
+  initialVisibility,
+  initialAccessType,
   onSave, 
   isSubmitting = false 
 }: EditorProps) {

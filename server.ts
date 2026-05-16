@@ -1060,41 +1060,6 @@ async function startServer() {
     }
   });
 
-  // +++ TEACHER DASHBOARD API +++
-  app.get("/api/teacher/dashboard", authenticateToken, requirePro, async (req, res) => {
-    try {
-      const userId = (req as any).user.id;
-      const [courses, classes, recentActivity, stats] = await Promise.all([
-        pool.query("SELECT * FROM courses WHERE created_by = $1 ORDER BY created_at DESC", [userId]),
-        pool.query("SELECT * FROM classes WHERE teacher_id = $1 ORDER BY created_at DESC", [userId]),
-        pool.query(`
-          SELECT lc.*, u.username, u.full_name, l.title_ru as lecture_title, c.title_ru as course_title
-          FROM lecture_completions lc
-          JOIN users u ON lc.user_id = u.id
-          JOIN lectures l ON lc.lecture_id = l.id
-          JOIN courses c ON l.course_id = c.id
-          WHERE c.created_by = $1
-          ORDER BY lc.completed_at DESC
-          LIMIT 10
-        `, [userId]),
-        pool.query(`
-          SELECT 
-            (SELECT COUNT(*) FROM class_enrollments ce JOIN classes cls ON ce.class_id = cls.id WHERE cls.teacher_id = $1) as total_students,
-            (SELECT COUNT(*) FROM assignments a JOIN classes cls ON a.class_id = cls.id WHERE cls.teacher_id = $1) as total_assignments
-        `, [userId])
-      ]);
-      res.json({
-        courses: courses.rows,
-        classes: classes.rows,
-        recent_activity: recentActivity.rows,
-        stats: stats.rows[0]
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Failed to fetch teacher dashboard" });
-    }
-  });
-
   // +++ LECTURE ACCESS API +++
   app.post("/api/lectures/:id/access", authenticateToken, async (req, res) => {
     const lectureId = req.params.id;
@@ -1309,29 +1274,29 @@ async function startServer() {
     try {
       const teacherId = (req as any).user.id;
       
-      const coursesRes = await pool.query("SELECT * FROM courses WHERE created_by = $1", [teacherId]);
-      const classesRes = await pool.query("SELECT * FROM classes WHERE teacher_id = $1", [teacherId]);
-      
-      const statsRes = await pool.query(`
-        SELECT COUNT(DISTINCT ce.user_id) as total_students,
-               COUNT(DISTINCT a.id) as total_assignments
-        FROM classes c
-        LEFT JOIN class_enrollments ce ON c.id = ce.class_id
-        LEFT JOIN assignments a ON c.id = a.class_id
-        WHERE c.teacher_id = $1
-      `, [teacherId]);
-
-      const activityRes = await pool.query(`
-        SELECT lc.*, u.username, u.full_name, l.title_ru as lecture_title
-        FROM lecture_completions lc
-        JOIN users u ON lc.user_id = u.id
-        JOIN lectures l ON lc.lecture_id = l.id
-        JOIN class_enrollments ce ON u.id = ce.user_id
-        JOIN classes c ON ce.class_id = c.id
-        WHERE c.teacher_id = $1
-        ORDER BY lc.completed_at DESC
-        LIMIT 10
-      `, [teacherId]);
+      const [coursesRes, classesRes, statsRes, activityRes] = await Promise.all([
+        pool.query("SELECT * FROM courses WHERE created_by = $1", [teacherId]),
+        pool.query("SELECT * FROM classes WHERE teacher_id = $1", [teacherId]),
+        pool.query(`
+          SELECT COUNT(DISTINCT ce.user_id) as total_students,
+                 COUNT(DISTINCT a.id) as total_assignments
+          FROM classes c
+          LEFT JOIN class_enrollments ce ON c.id = ce.class_id
+          LEFT JOIN assignments a ON c.id = a.class_id
+          WHERE c.teacher_id = $1
+        `, [teacherId]),
+        pool.query(`
+          SELECT lc.*, u.username, u.full_name, l.title_ru as lecture_title
+          FROM lecture_completions lc
+          JOIN users u ON lc.user_id = u.id
+          JOIN lectures l ON lc.lecture_id = l.id
+          JOIN class_enrollments ce ON u.id = ce.user_id
+          JOIN classes c ON ce.class_id = c.id
+          WHERE c.teacher_id = $1
+          ORDER BY lc.completed_at DESC
+          LIMIT 10
+        `, [teacherId])
+      ]);
 
       res.json({
         courses: coursesRes.rows,
@@ -1340,6 +1305,7 @@ async function startServer() {
         recent_activity: activityRes.rows
       });
     } catch (error) {
+      console.error("Dashboard error:", error);
       res.status(500).json({ error: "Failed to fetch dashboard" });
     }
   });

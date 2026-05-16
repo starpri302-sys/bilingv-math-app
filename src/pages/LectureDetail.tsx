@@ -304,7 +304,6 @@ export default function LectureDetail() {
             </header>
 
             {/* Access Control Section for Admin */}
-            {console.log('User:', user, 'Lecture:', lecture)}
             {(user?.role === 'super_admin' || user?.role === 'chief_editor') && (
               <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-6 mb-8">
                 <h4 className="font-bold text-emerald-900 mb-4 flex items-center gap-2">
