@@ -158,11 +158,6 @@ async function initDb(forceReinstall = false) {
       } catch (e) { /* ignore if already exists */ }
     }
     
-    try {
-      await (client.query ? client.query(`ALTER TABLE courses ADD COLUMN image_url TEXT`) : (client as any).exec(`ALTER TABLE courses ADD COLUMN image_url TEXT`));
-      console.log(`Migration: Added 'image_url' column to 'courses' table.`);
-    } catch (e) { /* ignore if already exists */ }
-
     console.log("Table 'users' ready.");
 
     // ... (keep existing users logic) ...
@@ -175,6 +170,7 @@ async function initDb(forceReinstall = false) {
         title_tyv TEXT,
         description_ru TEXT,
         description_tyv TEXT,
+        image_url TEXT,
         created_by TEXT REFERENCES users(id),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -432,6 +428,7 @@ async function initDb(forceReinstall = false) {
     console.log("All tables created successfully.");
 
     try { await client.exec(`ALTER TABLE academic_requests ADD COLUMN position TEXT`); } catch (e) {}
+    try { await client.exec(`ALTER TABLE courses ADD COLUMN image_url TEXT`); } catch (e) {}
 
     // Seed initial subjects and languages if empty
     const langCountRes = await client.query("SELECT COUNT(*) as count FROM languages");
