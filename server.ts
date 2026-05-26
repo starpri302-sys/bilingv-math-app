@@ -559,6 +559,7 @@ async function startServer() {
     if (!req.user) return res.status(401).json({ error: "Unauthorized" });
     const userRes = await pool.query("SELECT subscription_tier, role FROM users WHERE id = $1", [req.user.id]);
     const user = userRes.rows[0];
+    if (!user) return res.status(401).json({ error: "Unauthorized: User not found" });
     if (user.subscription_tier === 'pro' || user.role === 'admin' || user.role === 'teacher' || user.role === 'super_admin' || user.role === 'chief_editor') {
       next();
     } else {
@@ -1161,93 +1162,7 @@ async function startServer() {
     }
   });
 
-  // +++ CLASSES & ENROLLMENT API +++
-  app.get("/api/classes", authenticateToken, async (req, res) => {
-    try {
-      const classesRes = await pool.query("SELECT * FROM classes WHERE teacher_id = $1 ORDER BY created_at DESC", [(req as any).user.id]);
-      res.json(classesRes.rows);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch classes" });
-    }
-  });
 
-  app.post("/api/classes", authenticateToken, requirePro, async (req, res) => {
-    const { name, grade } = req.body;
-    const id = Math.random().toString(36).substr(2, 9);
-    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    try {
-      await pool.query(
-        "INSERT INTO classes (id, teacher_id, name, grade, invite_code) VALUES ($1, $2, $3, $4, $5)",
-        [id, (req as any).user.id, name, grade, inviteCode]
-      );
-      res.json({ id, inviteCode, success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to create class" });
-    }
-  });
-
-  app.post("/api/classes/join", authenticateToken, async (req, res) => {
-    const { inviteCode } = req.body;
-    try {
-      const classRes = await pool.query("SELECT id FROM classes WHERE invite_code = $1", [inviteCode.toUpperCase()]);
-      const cls = classRes.rows[0];
-      if (!cls) return res.status(404).json({ error: "Класс с таким кодом не найден." });
-
-      const enrollmentId = Math.random().toString(36).substr(2, 9);
-      await pool.query(
-        "INSERT INTO class_enrollments (id, class_id, user_id) VALUES ($1, $2, $3) ON CONFLICT (class_id, user_id) DO NOTHING",
-        [enrollmentId, cls.id, (req as any).user.id]
-      );
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to join class" });
-    }
-  });
-
-  app.get("/api/classes/:id/students", authenticateToken, async (req, res) => {
-    try {
-      const studentsRes = await pool.query(`
-        SELECT u.id, u.username, u.full_name, u.avatar, u.grade, ce.enrolled_at
-        FROM class_enrollments ce
-        JOIN users u ON ce.user_id = u.id
-        WHERE ce.class_id = $1
-        ORDER BY ce.enrolled_at DESC
-      `, [req.params.id]);
-      res.json(studentsRes.rows);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch students" });
-    }
-  });
-
-  // +++ ASSIGNMENTS API +++
-  app.get("/api/classes/:id/assignments", authenticateToken, async (req, res) => {
-    try {
-      const assignmentsRes = await pool.query(`
-        SELECT a.*, l.title_ru as lecture_title_ru, l.course_id
-        FROM assignments a
-        JOIN lectures l ON a.lecture_id = l.id
-        WHERE a.class_id = $1
-        ORDER BY a.due_date ASC
-      `, [req.params.id]);
-      res.json(assignmentsRes.rows);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch assignments" });
-    }
-  });
-
-  app.post("/api/classes/:id/assignments", authenticateToken, requirePro, async (req, res) => {
-    const { lecture_id, due_date } = req.body;
-    const id = Math.random().toString(36).substr(2, 9);
-    try {
-      await pool.query(
-        "INSERT INTO assignments (id, class_id, lecture_id, due_date) VALUES ($1, $2, $3, $4)",
-        [id, req.params.id, lecture_id, due_date]
-      );
-      res.json({ id, success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to create assignment" });
-    }
-  });
 
   app.post("/api/assignments/:assignmentId/submit", authenticateToken, async (req, res) => {
     const { assignmentId } = req.params;
@@ -1401,9 +1316,12 @@ async function startServer() {
     try {
       const userRes = await pool.query("SELECT role FROM users WHERE id = $1", [(req as any).user.id]);
       const user = userRes.rows[0];
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
       
       let classesRes;
-      if (user.role === 'super_admin' || user.role === 'chief_editor' || user.role === 'teacher') {
+      if (user.role === 'super_admin' || user.role === 'chief_editor' || user.role === 'teacher' || user.role === 'admin') {
         classesRes = await pool.query("SELECT * FROM classes WHERE teacher_id = $1 ORDER BY created_at DESC", [(req as any).user.id]);
       } else {
         classesRes = await pool.query(`
