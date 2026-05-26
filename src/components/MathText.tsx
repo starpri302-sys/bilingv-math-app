@@ -8,7 +8,6 @@ interface MathTextProps {
 }
 
 const boxTokens = /[\u25A0-\u25FF\u2610\u20DE\uF000-\uF0FF]/g;
-const digitRegex = /(\d+)/g;
 
 export default function MathText({ text, className, as: Component = 'span', isHtml = false }: MathTextProps) {
   if (!text) return null;
@@ -17,30 +16,37 @@ export default function MathText({ text, className, as: Component = 'span', isHt
     return `<span class="font-mono font-medium text-[1.1em] text-emerald-700 bg-emerald-50/50 px-0.5 rounded leading-none" aria-hidden="false">${match}</span>`;
   };
 
+  const styleSymbol = (match: string) => {
+    return `<span class="font-mono font-black text-emerald-600 scale-110 inline-block mx-0.5">${match}</span>`;
+  };
+
   if (isHtml) {
-    // Improved character-level processing for HTML to avoid tagging digits in attributes
     const processedHtml = text.replace(/<[^>]+>|[^<]+/g, (match) => {
       if (match.startsWith('<')) return match; // Skip HTML tags
       
-      // Process text nodes: replace digits and math symbols
-      let nodeText = match.replace(/\b(\d+)\b/g, styleDigit);
-      nodeText = nodeText.replace(/(\+|-|=|>|<|\*|\/|\^|√)/g, '<span class="font-mono font-black text-emerald-600 scale-110 inline-block mx-0.5">$1</span>');
+      const videoRegex = /(https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|vimeo\.com)\/\S+)/g;
+      const parts = match.split(videoRegex);
       
-      // Detected video links then wrap them
-      nodeText = nodeText.replace(/(https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|vimeo\.com)\/\S+)/g, (url) => {
-        let embedUrl = url;
-        if (url.includes('youtube.com') || url.includes('youtu.be')) {
-          const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
-          embedUrl = `https://www.youtube.com/embed/${videoId}`;
-        } else if (url.includes('vimeo.com')) {
-          const videoId = url.split('/').pop();
-          embedUrl = `https://player.vimeo.com/video/${videoId}`;
+      return parts.map((part, index) => {
+        if (index % 2 === 1) { // It's a video URL
+          let embedUrl = part;
+          if (part.includes('youtube.com') || part.includes('youtu.be')) {
+            const videoId = part.split('v=')[1]?.split('&')[0] || part.split('/').pop();
+            embedUrl = `https://www.youtube.com/embed/${videoId}`;
+          } else if (part.includes('vimeo.com')) {
+            const videoId = part.split('/').pop();
+            embedUrl = `https://player.vimeo.com/video/${videoId}`;
+          }
+          return `<div class="my-8 rounded-3xl overflow-hidden shadow-xl aspect-video bg-black"><iframe class="w-full h-full" src="${embedUrl}" allowfullscreen></iframe></div>`;
+        } else {
+          // Process text for numbers and symbols in a single pass to avoid corrupting injected HTML
+          return part.replace(/(\b\d+\b)|([\+\-\=\>\<\*\/\^√])/g, (m, digit, symbol) => {
+            if (digit) return styleDigit(digit);
+            if (symbol) return styleSymbol(symbol);
+            return m;
+          });
         }
-        
-        return `<div class="my-8 rounded-3xl overflow-hidden shadow-xl aspect-video bg-black"><iframe class="w-full h-full" src="${embedUrl}" allowfullscreen></iframe></div>`;
-      });
-
-      return nodeText;
+      }).join('');
     });
     
     return (
@@ -58,7 +64,7 @@ export default function MathText({ text, className, as: Component = 'span', isHt
     const parts = rawText.split(videoRegex);
     
     return parts.map((part, index) => {
-      if (videoRegex.test(part)) {
+      if (index % 2 === 1) { // It's a video URL
         let embedUrl = part;
         if (part.includes('youtube.com') || part.includes('youtu.be')) {
           const videoId = part.split('v=')[1]?.split('&')[0] || part.split('/').pop();
