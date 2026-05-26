@@ -153,13 +153,13 @@ async function initDb(forceReinstall = false) {
 
     for (const col of columnsToMigrate) {
       try {
-        await client.exec(`ALTER TABLE ${col.table} ADD COLUMN ${col.column} ${col.type}`);
+        await (client.query ? client.query(`ALTER TABLE ${col.table} ADD COLUMN ${col.column} ${col.type}`) : (client as any).exec(`ALTER TABLE ${col.table} ADD COLUMN ${col.column} ${col.type}`));
         console.log(`Migration: Added '${col.column}' column to '${col.table}' table.`);
       } catch (e) { /* ignore if already exists */ }
     }
     
     try {
-      await client.exec(`ALTER TABLE courses ADD COLUMN image_url TEXT`);
+      await (client.query ? client.query(`ALTER TABLE courses ADD COLUMN image_url TEXT`) : (client as any).exec(`ALTER TABLE courses ADD COLUMN image_url TEXT`));
       console.log(`Migration: Added 'image_url' column to 'courses' table.`);
     } catch (e) { /* ignore if already exists */ }
 
@@ -244,6 +244,13 @@ async function initDb(forceReinstall = false) {
         user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
         enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY(class_id, user_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS class_courses (
+        class_id TEXT REFERENCES classes(id) ON DELETE CASCADE,
+        course_id TEXT REFERENCES courses(id) ON DELETE CASCADE,
+        assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY(class_id, course_id)
       );
 
       CREATE TABLE IF NOT EXISTS assignments (
@@ -562,17 +569,60 @@ async function startServer() {
     }
   };
 
+  const optionalAuthenticateToken = (req: any, res: any, next: any) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      const token = authHeader.split(' ')[1];
+      jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+        if (!err) req.user = user;
+        next();
+      });
+    } else {
+      next();
+    }
+  };
+
   // ... (existing helper functions) ...
 
   // +++ EDUCATIONAL COURSES & LECTURES API +++
-  app.get("/api/courses", async (req, res) => {
+  app.get("/api/courses", optionalAuthenticateToken, async (req, res) => {
     try {
-      const coursesRes = await pool.query(`
-        SELECT c.*, s.name_ru as subject_name_ru, s.name_tyv as subject_name_tyv, s.color as subject_color
+      const userId = (req as any).user?.id;
+      let queryStr = `
+        SELECT c.*, s.name_ru as subject_name_ru, s.name_tyv as subject_name_tyv, s.color as subject_color,
+          (
+            SELECT json_group_array(json_object('id', cl.id, 'name', cl.name))
+            FROM class_courses cc
+            JOIN classes cl ON cc.class_id = cl.id
+            WHERE cc.course_id = c.id
+          ) as assigned_classes_json
         FROM courses c 
         LEFT JOIN subjects s ON c.subject_id = s.id 
-        ORDER BY c.created_at DESC
-      `);
+      `;
+      let params: any[] = [];
+      
+      if (userId) {
+        const userRes = await pool.query("SELECT role FROM users WHERE id = $1", [userId]);
+        const user = userRes.rows[0];
+        if (user && user.role !== 'admin' && user.role !== 'super_admin' && user.role !== 'chief_editor' && user.role !== 'teacher') {
+          queryStr += `
+            WHERE NOT EXISTS (SELECT 1 FROM class_courses cc WHERE cc.course_id = c.id)
+            OR c.id IN (
+              SELECT cc.course_id 
+              FROM class_courses cc 
+              JOIN class_enrollments ce ON cc.class_id = ce.class_id 
+              WHERE ce.user_id = $1
+            )
+          `;
+          params = [userId];
+        }
+      } else {
+        queryStr += ` WHERE NOT EXISTS (SELECT 1 FROM class_courses cc WHERE cc.course_id = c.id) `;
+      }
+      
+      queryStr += ` ORDER BY c.created_at DESC `;
+      
+      const coursesRes = await pool.query(queryStr, params);
       res.json(coursesRes.rows);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch courses" });
@@ -750,6 +800,31 @@ async function startServer() {
     } catch (error) {
       console.error("POST /api/courses error:", error);
       res.status(500).json({ error: "Failed to create course" });
+    }
+  });
+
+  app.get("/api/courses/:id/classes", authenticateToken, requirePro, async (req, res) => {
+    try {
+      const resp = await pool.query("SELECT class_id FROM class_courses WHERE course_id = $1", [req.params.id]);
+      res.json(resp.rows.map((r: any) => r.class_id));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch course classes" });
+    }
+  });
+
+  app.post("/api/courses/:id/classes", authenticateToken, requirePro, async (req, res) => {
+    const { class_ids } = req.body; // Array of class IDs
+    try {
+      await pool.query("DELETE FROM class_courses WHERE course_id = $1", [req.params.id]);
+      if (class_ids && class_ids.length > 0) {
+        // Simple sequential insert for sqlite compatibility and ease
+        for (const cid of class_ids) {
+          await pool.query("INSERT INTO class_courses (course_id, class_id) VALUES ($1, $2)", [req.params.id, cid]);
+        }
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update course classes" });
     }
   });
 

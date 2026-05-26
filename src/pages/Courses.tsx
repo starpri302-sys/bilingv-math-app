@@ -24,6 +24,7 @@ interface Course {
   subject_color?: string;
   created_at: string;
   image_url?: string;
+  assigned_classes_json?: string;
 }
 
 interface Lecture {
@@ -85,8 +86,53 @@ export default function Courses() {
   const [joining, setJoining] = useState(false);
   const [showAcademicModal, setShowAcademicModal] = useState(false);
   const [academicForm, setAcademicForm] = useState({ full_name: '', school: '', position: '', subjects: '' });
+  
+  const [showClassesModal, setShowClassesModal] = useState(false);
+  const [teacherClasses, setTeacherClasses] = useState<any[]>([]);
+  const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
+  const [isSavingClasses, setIsSavingClasses] = useState(false);
 
   const { isPro, isTeacher, user, profile } = useAuth();
+
+  const fetchTeacherClasses = async (courseId: string) => {
+    try {
+      const allRes = await api.getClasses();
+      const selectedRes = await fetch(`/api/courses/${courseId}/classes`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!selectedRes.ok) throw new Error('Failed to fetch assigned classes');
+      const selectedIds = await selectedRes.json();
+      setTeacherClasses(allRes);
+      setSelectedClassIds(selectedIds);
+      setShowClassesModal(true);
+    } catch (err) {
+      console.error(err);
+      alert('Ошибка при загрузке классов');
+    }
+  };
+
+  const saveCourseClasses = async () => {
+    if (!selectedCourse) return;
+    setIsSavingClasses(true);
+    try {
+      const res = await fetch(`/api/courses/${selectedCourse.id}/classes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ class_ids: selectedClassIds })
+      });
+      if (!res.ok) throw new Error('Failed to save');
+      setShowClassesModal(false);
+      fetchData(); // Refresh list to get updated json array
+    } catch (err) {
+      console.error(err);
+      alert('Ошибка при сохранении доступов');
+    } finally {
+      setIsSavingClasses(false);
+    }
+  };
 
   const handleAcademicSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -240,8 +286,9 @@ export default function Courses() {
       setEditingCourse(null);
       setNewCourse({ title_ru: '', title_tyv: '', desc_ru: '', desc_tyv: '', subject_id: '', image_url: '' });
       fetchData();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save course:', err);
+      alert('Ошибка при сохранении курса: ' + (err.message || 'Неизвестная ошибка'));
     } finally {
       setIsSubmitting(false);
     }
@@ -315,8 +362,9 @@ export default function Courses() {
       setEditingModule(null);
       setNewModule({ title_ru: '', title_tyv: '', order_index: 0 });
       fetchCourseLectures(id);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save module:', err);
+      alert('Ошибка при сохранении модуля: ' + (err.message || 'Неизвестная ошибка'));
     } finally {
       setIsSubmitting(false);
     }
@@ -418,6 +466,13 @@ export default function Courses() {
                    >
                      <BarChart3 className="w-4 h-4" />
                      {showStats ? 'Скрыть отчет' : 'Прогресс учеников'}
+                   </button>
+                   <button 
+                     onClick={() => fetchTeacherClasses(selectedCourse.id)}
+                     className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold bg-stone-100 text-stone-600 hover:bg-stone-200 transition-all text-xs uppercase tracking-widest"
+                   >
+                     <Users className="w-4 h-4" />
+                     Доступ
                    </button>
                 </div>
               )}
@@ -694,6 +749,188 @@ export default function Courses() {
             </div>
           )}
         </div>
+
+        {showModuleModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl relative"
+            >
+              <button 
+                onClick={() => setShowModuleModal(false)}
+                className="absolute top-6 right-6 text-stone-400 hover:text-stone-900 transition-colors p-2"
+              >
+                <X className="w-6 h-6" />
+              </button>
+              <div className="p-8 sm:p-10">
+                <h2 className="text-2xl font-serif font-black text-stone-900 mb-8">
+                  {editingModule ? 'Редактировать модуль' : 'Новый модуль'}
+                </h2>
+                <form onSubmit={handleSaveModule} className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Название (RU)</label>
+                    <input 
+                      required
+                      value={newModule.title_ru}
+                      onChange={(e) => setNewModule({ ...newModule, title_ru: e.target.value })}
+                      className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-emerald-500/10"
+                      placeholder="Напр: Основы тригонометрии"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Название (TYV)</label>
+                    <input 
+                      value={newModule.title_tyv}
+                      onChange={(e) => setNewModule({ ...newModule, title_tyv: e.target.value })}
+                      className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
+                  <button 
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full bg-stone-900 text-white rounded-2xl py-5 font-black hover:bg-emerald-600 transition-all disabled:opacity-50 uppercase tracking-widest text-xs"
+                  >
+                    {isSubmitting ? 'Сохранение...' : 'Сохранить модуль'}
+                  </button>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+      {showCreateModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-md">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-[2.5rem] w-full max-w-xl overflow-hidden shadow-2xl relative"
+          >
+            <button 
+              onClick={() => setShowCreateModal(false)}
+              className="absolute top-6 right-6 text-stone-400 hover:text-stone-900 transition-colors p-2"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            
+            <div className="p-8 sm:p-12">
+              <h2 className="text-3xl font-serif font-black text-stone-900 mb-8">
+                {editingCourse ? 'Редактировать курс' : 'Новый курс'}
+              </h2>
+              <form onSubmit={handleCreateCourse} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Дисциплина</label>
+                  <select 
+                    required
+                    value={newCourse.subject_id}
+                    onChange={(e) => setNewCourse({ ...newCourse, subject_id: e.target.value })}
+                    className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-emerald-500/10 font-bold"
+                  >
+                    <option value="">Выбрать предмет...</option>
+                    {subjects.map(s => <option key={s.id} value={s.id}>{s.name_ru}</option>)}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Название (RU)</label>
+                    <input 
+                      required
+                      value={newCourse.title_ru}
+                      onChange={(e) => setNewCourse({ ...newCourse, title_ru: e.target.value })}
+                      className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Название (TYV)</label>
+                    <input 
+                      value={newCourse.title_tyv}
+                      onChange={(e) => setNewCourse({ ...newCourse, title_tyv: e.target.value })}
+                      className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Описание</label>
+                  <textarea 
+                    value={newCourse.desc_ru}
+                    onChange={(e) => setNewCourse({ ...newCourse, desc_ru: e.target.value })}
+                    className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 h-32 outline-none focus:ring-4 focus:ring-emerald-500/10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Ссылка на изображение</label>
+                  <input 
+                    value={newCourse.image_url}
+                    onChange={(e) => setNewCourse({ ...newCourse, image_url: e.target.value })}
+                    className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-emerald-500/10"
+                    placeholder="https://example.com/image.jpg"
+                  />
+                </div>
+
+                <button 
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-stone-900 text-white rounded-2xl py-5 font-black hover:bg-emerald-600 transition-all disabled:opacity-50 uppercase tracking-widest text-xs"
+                >
+                  {isSubmitting ? 'Сохранение...' : (editingCourse ? 'Сохранить изменения' : 'Создать курс')}
+                </button>
+              </form>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {showClassesModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-md">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-[2.5rem] w-full max-w-xl overflow-hidden shadow-2xl relative"
+          >
+            <button 
+              onClick={() => setShowClassesModal(false)}
+              className="absolute top-6 right-6 text-stone-400 hover:text-stone-900 transition-colors p-2"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <div className="p-8 sm:p-12">
+              <h2 className="text-3xl font-serif font-black text-stone-900 mb-8">
+                Доступ для классов
+              </h2>
+              <div className="space-y-4 mb-8 max-h-[50vh] overflow-y-auto pr-2">
+                {teacherClasses.length === 0 ? (
+                  <p className="text-stone-500 font-medium text-center">У вас пока нет созданных классов.</p>
+                ) : (
+                  teacherClasses.map(c => (
+                    <label key={c.id} className="flex items-center gap-4 p-4 border border-stone-200 rounded-2xl cursor-pointer hover:bg-stone-50 transition-colors">
+                      <input 
+                        type="checkbox"
+                        checked={selectedClassIds.includes(c.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedClassIds([...selectedClassIds, c.id]);
+                          else setSelectedClassIds(selectedClassIds.filter(id => id !== c.id));
+                        }}
+                        className="w-5 h-5 rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span className="font-bold text-stone-900">{c.name}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+              <button 
+                onClick={saveCourseClasses}
+                disabled={isSavingClasses}
+                className="w-full bg-stone-900 text-white rounded-2xl py-5 font-black hover:bg-emerald-600 transition-all disabled:opacity-50 uppercase tracking-widest text-xs"
+              >
+                {isSavingClasses ? 'Сохранение...' : 'Сохранить доступ'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       </div>
     );
   }
@@ -977,7 +1214,16 @@ export default function Courses() {
         ) : currentCourses.length > 0 ? (
           <div>
             <div className={viewMode === 'card' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" : "space-y-4"}>
-              {currentCourses.map((course, idx) => (
+              {currentCourses.map((course, idx) => {
+                let assignedToClasses: any[] = [];
+                try {
+                  if (course.assigned_classes_json) {
+                    const parsed = JSON.parse(course.assigned_classes_json);
+                    assignedToClasses = parsed.filter((p: any) => p && p.id != null);
+                  }
+                } catch(e) {}
+
+                return (
                 <motion.div
                   key={course.id}
                   initial={{ opacity: 0, scale: 0.95 }}
@@ -985,7 +1231,7 @@ export default function Courses() {
                   transition={{ delay: idx * 0.1 }}
                   className={viewMode === 'card' 
                     ? "group bg-white rounded-3xl border border-stone-200 overflow-hidden hover:shadow-xl transition-all duration-300"
-                    : "group bg-white rounded-3xl border border-stone-200 p-6 flex items-center justify-between hover:shadow-lg transition-all duration-300"
+                    : "group bg-white rounded-3xl border border-stone-200 p-6 flex flex-col md:flex-row items-start md:items-center justify-between hover:shadow-lg transition-all duration-300 gap-4"
                   }
                 >
                   <div className={viewMode === 'card' ? "p-8 pb-4" : "flex items-center gap-6 flex-grow"}>
@@ -1064,11 +1310,21 @@ export default function Courses() {
 
                   <div className="px-8 pb-8 pt-4">
                     <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center gap-4 text-xs text-stone-400 font-medium tracking-wide">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-stone-400 font-medium tracking-wide">
                         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={course.subject_color ? { backgroundColor: `${course.subject_color}10`, color: course.subject_color } : {}}>
                           <Sparkles className="w-3 h-3" />
                           {course.subject_name_ru}
                         </div>
+                        {assignedToClasses.length > 0 ? assignedToClasses.map(cls => (
+                          <div key={cls.id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-100/80 text-stone-500">
+                            <Users className="w-3 h-3" />
+                            {cls.name}
+                          </div>
+                        )) : (
+                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50/80 text-emerald-600">
+                            Общий доступ
+                          </div>
+                        )}
                       </div>
                     </div>
                     
@@ -1081,7 +1337,8 @@ export default function Courses() {
                     </Link>
                   </div>
                 </motion.div>
-              ))}
+                );
+              })}
             </div>
             
             <Pagination 
