@@ -456,6 +456,21 @@ export const api = {
     });
     return handleResponse(res);
   },
+  async updateClass(id: string, data: any) {
+    const res = await fetch(`/api/classes/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+  async deleteClass(id: string) {
+    const res = await fetch(`/api/classes/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
   async joinClass(inviteCode: string) {
     const res = await fetch('/api/classes/join', {
       method: 'POST',

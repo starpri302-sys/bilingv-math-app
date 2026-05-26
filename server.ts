@@ -1226,6 +1226,42 @@ async function startServer() {
     }
   });
 
+  app.put("/api/classes/:id", authenticateToken, requirePro, async (req, res) => {
+    const { id } = req.params;
+    const { name } = req.body;
+
+    try {
+      // check ownership
+      const classRes = await pool.query("SELECT * FROM classes WHERE id = $1 AND teacher_id = $2", [id, (req as any).user.id]);
+      if (classRes.rows.length === 0) {
+        return res.status(404).json({ error: "Class not found or unauthorized" });
+      }
+
+      await pool.query("UPDATE classes SET name = $1 WHERE id = $2", [name, id]);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update class" });
+    }
+  });
+
+  app.delete("/api/classes/:id", authenticateToken, requirePro, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      // check ownership
+      const classRes = await pool.query("SELECT * FROM classes WHERE id = $1 AND teacher_id = $2", [id, (req as any).user.id]);
+      if (classRes.rows.length === 0) {
+        return res.status(404).json({ error: "Class not found or unauthorized" });
+      }
+
+      await pool.query("DELETE FROM classes WHERE id = $1", [id]);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete class" });
+    }
+  });
+
+
   app.post("/api/classes/join", authenticateToken, async (req, res) => {
     const { inviteCode } = req.body;
     try {

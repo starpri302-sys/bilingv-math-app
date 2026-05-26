@@ -4,7 +4,8 @@ import {
   Users, BookOpen, GraduationCap, Plus, FolderPlus, 
   ChevronRight, ArrowRight, BarChart3, Clock, 
   Star, ClipboardList, Settings, Search, MoreHorizontal,
-  Mail, School, BookMarked, Layers, FileText, CheckCircle2, X
+  Mail, School, BookMarked, Layers, FileText, CheckCircle2, X,
+  Edit2, Trash2
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
@@ -34,6 +35,7 @@ export default function TeacherDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'courses' | 'classes' | 'resources'>('overview');
   const [showCreateClass, setShowCreateClass] = useState(false);
   const [newClassName, setNewClassName] = useState('');
+  const [editClassModal, setEditClassModal] = useState<{show: boolean, id: string, name: string}>({ show: false, id: '', name: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [coursesPage, setCoursesPage] = useState(1);
   const [classesPage, setClassesPage] = useState(1);
@@ -100,6 +102,37 @@ export default function TeacherDashboard() {
       setData(dashboardData);
     } catch (err) {
       console.error('Failed to create class:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateClass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editClassModal.name.trim()) return;
+    setIsSubmitting(true);
+    try {
+      await api.updateClass(editClassModal.id, { name: editClassModal.name });
+      setEditClassModal({ show: false, id: '', name: '' });
+      // Refresh data
+      const dashboardData = await api.getTeacherDashboard();
+      setData(dashboardData);
+    } catch (err) {
+      console.error('Failed to update class:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteClass = async (id: string, name: string) => {
+    if (!window.confirm(`Вы уверены, что хотите удалить класс "${name}"? Это действие нельзя отменить.`)) return;
+    setIsSubmitting(true);
+    try {
+      await api.deleteClass(id);
+      const dashboardData = await api.getTeacherDashboard();
+      setData(dashboardData);
+    } catch (err) {
+      console.error('Failed to delete class:', err);
     } finally {
       setIsSubmitting(false);
     }
@@ -334,6 +367,23 @@ export default function TeacherDashboard() {
                     
                     <div className="flex items-center justify-between pt-6 border-t border-stone-100">
                        <Link to={`/teacher/classes/${cls.id}`} className="text-[10px] font-black text-stone-900 uppercase tracking-widest hover:text-emerald-600 underline">Журнал</Link>
+                       <div className="flex items-center gap-3">
+                         <button 
+                           onClick={() => setEditClassModal({ show: true, id: cls.id, name: cls.name })}
+                           className="text-stone-400 hover:text-blue-600 transition-colors"
+                           title="Редактировать"
+                         >
+                           <Edit2 className="w-4 h-4" />
+                         </button>
+                         <button 
+                           onClick={() => handleDeleteClass(cls.id, cls.name)}
+                           disabled={isSubmitting}
+                           className="text-stone-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                           title="Удалить"
+                         >
+                           <Trash2 className="w-4 h-4" />
+                         </button>
+                       </div>
                     </div>
                  </div>
                ))}
@@ -435,6 +485,48 @@ export default function TeacherDashboard() {
                      className="w-full bg-emerald-600 text-white rounded-2xl py-5 font-black shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all uppercase tracking-widest text-xs disabled:opacity-50"
                    >
                      {isSubmitting ? 'Создание...' : 'Создать и получить код'}
+                   </button>
+                 </form>
+             </div>
+           </motion.div>
+        </div>
+      )}
+
+      {/* Edit Class Modal */}
+      {editClassModal.show && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-md">
+           <motion.div 
+             initial={{ opacity: 0, scale: 0.95 }}
+             animate={{ opacity: 1, scale: 1 }}
+             className="bg-white rounded-[2.5rem] w-full max-w-md overflow-hidden shadow-2xl relative"
+           >
+             <button 
+               onClick={() => setEditClassModal({ show: false, id: '', name: '' })}
+               className="absolute top-6 right-6 text-stone-400 hover:text-stone-900 transition-colors p-2"
+             >
+               <X className="w-6 h-6" />
+             </button>
+             
+             <div className="p-10">
+                <h2 className="text-3xl font-serif font-black text-stone-900 mb-8">Редактировать класс</h2>
+                <form onSubmit={handleUpdateClass} className="space-y-6">
+                   <div className="space-y-2">
+                     <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Название класса</label>
+                     <input 
+                       required
+                       autoFocus
+                       placeholder="Напр: 10-А класс, Математика"
+                       value={editClassModal.name}
+                       onChange={(e) => setEditClassModal({ ...editClassModal, name: e.target.value })}
+                       className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-blue-500/10 font-bold"
+                     />
+                   </div>
+                   <button 
+                     type="submit"
+                     disabled={isSubmitting}
+                     className="w-full bg-blue-600 text-white rounded-2xl py-5 font-black shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all uppercase tracking-widest text-xs disabled:opacity-50"
+                   >
+                     {isSubmitting ? 'Сохранение...' : 'Сохранить изменения'}
                    </button>
                  </form>
              </div>
