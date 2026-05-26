@@ -333,6 +333,12 @@ export const api = {
     });
     return handleResponse(res);
   },
+  async getUserDiary() {
+    const res = await fetch('/api/users/me/diary', {
+      headers: getAuthHeader()
+    });
+    return handleResponse(res);
+  },
   async getCourseStats(courseId: string) {
     const res = await fetch(`/api/courses/${courseId}/stats`, {
       headers: getAuthHeader()

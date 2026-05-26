@@ -750,6 +750,135 @@ async function startServer() {
     }
   });
 
+  app.get("/api/users/me/diary", authenticateToken, async (req, res) => {
+    try {
+      const userId = (req as any).user.id;
+      // Get classes of user
+      const classesRes = await pool.query(
+        "SELECT ce.class_id, c.name FROM class_enrollments ce JOIN classes c ON ce.class_id = c.id WHERE ce.user_id = $1",
+        [userId]
+      );
+      const studentClassIds = classesRes.rows.map((row: any) => row.class_id);
+
+      if (studentClassIds.length === 0) {
+        return res.json([]);
+      }
+
+      const placeholders = studentClassIds.map((_, i) => `$${i + 1}`).join(', ');
+      const coursesQuery = `
+        SELECT DISTINCT c.id, c.title_ru, c.title_tyv, c.description_ru, c.description_tyv, c.image_url,
+               s.name_ru as subject_name_ru, s.name_tyv as subject_name_tyv, s.color as subject_color,
+               cl.id as class_id, cl.name as class_name
+        FROM class_courses cc
+        JOIN courses c ON cc.course_id = c.id
+        JOIN classes cl ON cc.class_id = cl.id
+        LEFT JOIN subjects s ON c.subject_id = s.id
+        WHERE cc.class_id IN (${placeholders})
+      `;
+      const coursesRes = await pool.query(coursesQuery, studentClassIds);
+
+      const coursesMap = new Map<string, any>();
+      for (const row of coursesRes.rows) {
+        if (!coursesMap.has(row.id)) {
+          coursesMap.set(row.id, {
+            id: row.id,
+            title_ru: row.title_ru,
+            title_tyv: row.title_tyv,
+            description_ru: row.description_ru,
+            description_tyv: row.description_tyv,
+            image_url: row.image_url,
+            subject_name_ru: row.subject_name_ru,
+            subject_name_tyv: row.subject_name_tyv,
+            subject_color: row.subject_color,
+            classes: [],
+            modules: []
+          });
+        }
+        coursesMap.get(row.id).classes.push({ id: row.class_id, name: row.class_name });
+      }
+      const courses = Array.from(coursesMap.values());
+
+      for (const c of courses) {
+        // Fetch modules
+        const modulesRes = await pool.query(
+          "SELECT id, title_ru, title_tyv, order_index FROM course_modules WHERE course_id = $1 ORDER BY order_index ASC",
+          [c.id]
+        );
+        
+        // Fetch lectures with completions for this user
+        const lecturesRes = await pool.query(`
+          SELECT l.id, l.module_id, l.title_ru, l.title_tyv, l.item_type, l.order_index,
+                 lc.score, lc.max_score, lc.completed_at
+          FROM lectures l
+          LEFT JOIN lecture_completions lc ON l.id = lc.lecture_id AND lc.user_id = $1
+          WHERE l.course_id = $2
+          ORDER BY l.order_index ASC
+        `, [userId, c.id]);
+
+        const modulesMap = new Map<string, any>();
+        const unparentedLectures: any[] = [];
+
+        for (const m of modulesRes.rows) {
+          modulesMap.set(m.id, {
+            id: m.id,
+            title_ru: m.title_ru,
+            title_tyv: m.title_tyv,
+            order_index: m.order_index,
+            lectures: []
+          });
+        }
+
+        let totalLectures = lecturesRes.rows.length;
+        let completedCount = 0;
+
+        for (const l of lecturesRes.rows) {
+          const isCompleted = l.completed_at !== null;
+          if (isCompleted) {
+            completedCount++;
+          }
+          const lectureObj = {
+            id: l.id,
+            title_ru: l.title_ru,
+            title_tyv: l.title_tyv,
+            item_type: l.item_type,
+            order_index: l.order_index,
+            is_completed: isCompleted,
+            score: l.score,
+            max_score: l.max_score,
+            completed_at: l.completed_at
+          };
+
+          if (l.module_id && modulesMap.has(l.module_id)) {
+            modulesMap.get(l.module_id).lectures.push(lectureObj);
+          } else {
+            unparentedLectures.push(lectureObj);
+          }
+        }
+
+        const modulesList = Array.from(modulesMap.values()).sort((a: any, b: any) => a.order_index - b.order_index);
+        if (unparentedLectures.length > 0) {
+          modulesList.unshift({
+            id: "unparented",
+            title_ru: "Общие материалы",
+            title_tyv: "Ниити материалдар",
+            order_index: -1,
+            lectures: unparentedLectures
+          });
+        }
+
+        c.modules = modulesList;
+        c.total_lectures = totalLectures;
+        c.completed_lectures = completedCount;
+        c.completion_percentage = totalLectures > 0 ? Math.round((completedCount / totalLectures) * 100) : 0;
+      }
+
+      res.json(courses);
+    } catch (error) {
+      console.error("GET /api/users/me/diary error:", error);
+      res.status(500).json({ error: "Failed to fetch student diary" });
+    }
+  });
+
   app.get("/api/courses/:id/stats", authenticateToken, requirePro, async (req, res) => {
     try {
       const statsRes = await pool.query(`
