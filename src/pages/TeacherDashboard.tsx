@@ -40,7 +40,6 @@ export default function TeacherDashboard() {
   const [coursesPage, setCoursesPage] = useState(1);
   const [classesPage, setClassesPage] = useState(1);
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [favorites, setFavorites] = useState<any[]>([]);
 
   // Setup WS connection
   const socket = useSocket();
@@ -71,14 +70,12 @@ export default function TeacherDashboard() {
     const fetchData = async () => {
       if (!user) return;
       try {
-        const [dashboardData, notificationsData, favoritesData] = await Promise.all([
+        const [dashboardData, notificationsData] = await Promise.all([
           api.getTeacherDashboard(),
-          api.getNotifications(user.id),
-          api.getFavorites()
+          api.getNotifications(user.id)
         ]);
         setData(dashboardData);
         setNotifications(notificationsData);
-        setFavorites(Array.isArray(favoritesData) ? favoritesData : []);
       } catch (err) {
         console.error('Failed to fetch data:', err);
       } finally {
@@ -406,26 +403,6 @@ export default function TeacherDashboard() {
 
         {/* Right Column: Sidebar info */}
         <div className="space-y-8">
-           <div className="bg-white rounded-[2.5rem] border border-stone-200 p-8 shadow-sm">
-             <div className="flex items-center gap-3 mb-8">
-               <Star className="w-6 h-6 text-amber-500 fill-amber-500" />
-               <h3 className="text-xl font-serif font-black text-stone-900">Избранное</h3>
-             </div>
-             
-             <div className="space-y-4">
-                {favorites.length > 0 ? favorites.map(fav => (
-                  <Link key={fav.id} to={`/terms/${fav.term_id}`} className="block p-4 bg-stone-50 rounded-2xl hover:bg-stone-100 transition-colors">
-                    <h4 className="font-bold text-stone-900">{fav.term_name_ru}</h4>
-                    <p className="text-xs text-stone-500 italic mt-1">{fav.term_name_tyv}</p>
-                  </Link>
-                )) : (
-                  <div className="p-4 bg-stone-50 rounded-2xl text-stone-400 text-center italic text-sm">
-                    Здесь появятся материалы, которые вы отметили как избранные
-                  </div>
-                )}
-             </div>
-           </div>
-
            <div className="bg-stone-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden group shadow-xl">
              <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.2),transparent)] opacity-0 group-hover:opacity-100 transition-opacity" />
              <h3 className="text-xl font-serif font-black mb-6 flex items-center gap-3">

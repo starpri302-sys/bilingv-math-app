@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../store/authContext';
 import { api } from '../services/api';
 import { motion } from 'motion/react';
-import { User, Mail, School, GraduationCap, Save, ShieldCheck, Camera, Trash2, BookOpen, Clock, CheckCircle, Key, Eye, EyeOff, Lock, ChevronDown, Heart, FileText } from 'lucide-react';
+import { User, Mail, School, GraduationCap, Save, ShieldCheck, Camera, Trash2, BookOpen, Clock, CheckCircle, Key, Lock, FileText } from 'lucide-react';
 import UserAvatar from '../components/UserAvatar';
 import TermCard from '../components/TermCard';
 import { AnimatePresence } from 'motion/react';
@@ -21,10 +21,8 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [userTerms, setUserTerms] = useState<any[]>([]);
-  const [favorites, setFavorites] = useState<any[]>([]);
   const [termsLoading, setTermsLoading] = useState(true);
-  const [favsLoading, setFavsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'profile' | 'terms' | 'favorites'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'terms'>('profile');
   const [passwordMessage, setPasswordMessage] = useState('');
   const [generatedPassword, setGeneratedPassword] = useState('');
   const [showGeneratedModal, setShowGeneratedModal] = useState(false);
@@ -41,7 +39,6 @@ export default function Profile() {
         bio: profile.bio || ''
       });
       fetchUserTerms();
-      fetchFavorites();
     }
   }, [profile]);
 
@@ -55,19 +52,6 @@ export default function Profile() {
       console.error('Error fetching user terms:', error);
     } finally {
       setTermsLoading(false);
-    }
-  };
-
-  const fetchFavorites = async () => {
-    if (!profile?.id) return;
-    setFavsLoading(true);
-    try {
-      const data = await api.getFavorites();
-      setFavorites(data);
-    } catch (error) {
-      console.error('Error fetching favorites:', error);
-    } finally {
-      setFavsLoading(false);
     }
   };
 
@@ -188,12 +172,6 @@ export default function Profile() {
           className={`px-6 py-4 text-sm font-bold uppercase tracking-widest transition-all border-b-2 whitespace-nowrap ${activeTab === 'terms' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-stone-400 hover:text-stone-600'}`}
         >
           Мои термины ({userTerms.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('favorites')}
-          className={`px-6 py-4 text-sm font-bold uppercase tracking-widest transition-all border-b-2 whitespace-nowrap ${activeTab === 'favorites' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-stone-400 hover:text-stone-600'}`}
-        >
-          Избранное ({favorites.length})
         </button>
       </div>
 
@@ -437,49 +415,6 @@ export default function Profile() {
                 <h3 className="text-lg font-bold text-stone-900">Вы еще не добавили ни одного термина</h3>
                 <p className="text-stone-500 max-w-xs mx-auto mt-2">
                   Ваши вклады помогают сделать справочник лучше для всех!
-                </p>
-              </div>
-            )}
-          </motion.div>
-        )}
-
-        {activeTab === 'favorites' && (
-          <motion.div
-            key="favorites"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="space-y-8"
-          >
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <h2 className="text-3xl font-serif font-black text-stone-900">Избранное</h2>
-                <p className="text-stone-500 font-medium">Термины, которые вы сохранили</p>
-              </div>
-              <div className="flex gap-4">
-                <div className="flex items-center gap-2 px-4 py-2 bg-white border border-stone-200 rounded-xl shadow-sm">
-                  <Heart className="w-4 h-4 text-red-500" />
-                  <span className="text-sm font-bold text-stone-900">{favorites.length}</span>
-                </div>
-              </div>
-            </div>
-
-            {favsLoading ? (
-              <div className="flex justify-center py-12">
-                <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin"></div>
-              </div>
-            ) : favorites.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {favorites.map((term) => (
-                  <TermCard key={term.id} term={term} language="ru" />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-16 bg-stone-50 rounded-3xl border-2 border-dashed border-stone-200">
-                <Heart className="w-12 h-12 text-stone-300 mx-auto mb-4" />
-                <h3 className="text-lg font-bold text-stone-900">У вас пока нет избранных терминов</h3>
-                <p className="text-stone-500 max-w-xs mx-auto mt-2">
-                  Сохраняйте полезные термины, чтобы они всегда были под рукой!
                 </p>
               </div>
             )}

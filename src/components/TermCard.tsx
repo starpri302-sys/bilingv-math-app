@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Book, ChevronRight, User, Heart, MessageSquare } from 'lucide-react';
+import { Book, ChevronRight, User } from 'lucide-react';
 import UserAvatar from './UserAvatar';
 import MathText from './MathText';
 import { api } from '../services/api';
@@ -14,30 +14,6 @@ interface TermCardProps {
 
 export default function TermCard({ term, language }: TermCardProps) {
   const { user } = useAuth();
-  const [isFavorite, setIsFavorite] = useState(false);
-  const [isToggling, setIsToggling] = useState(false);
-
-  useEffect(() => {
-    if (user) {
-      api.getFavoriteStatus(term.id).then(res => setIsFavorite(res.isFavorite));
-    }
-  }, [term.id, user]);
-
-  const handleToggleFavorite = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!user || isToggling) return;
-
-    setIsToggling(true);
-    try {
-      await api.toggleFavorite(term.id, isFavorite);
-      setIsFavorite(!isFavorite);
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
-    } finally {
-      setIsToggling(false);
-    }
-  };
 
   const translation = term.translations?.find((t: any) => t.lang_code === language) || term.translations?.[0] || {};
   const name = translation.name || 'No Name';
@@ -83,17 +59,6 @@ export default function TermCard({ term, language }: TermCardProps) {
             </span>
           </div>
         </Link>
-        
-        {user && (
-          <button
-            onClick={handleToggleFavorite}
-            disabled={isToggling}
-            className={`p-2.5 rounded-2xl transition-all ${isFavorite ? 'bg-red-50 text-red-500 shadow-sm' : 'bg-stone-100 text-stone-400 hover:text-red-400 hover:bg-red-50'}`}
-            title={isFavorite ? 'Удалить из избранного' : 'Добавить в избранное'}
-          >
-            <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
-          </button>
-        )}
       </div>
 
       {/* Main Content */}
@@ -149,13 +114,6 @@ export default function TermCard({ term, language }: TermCardProps) {
         </div>
         
         <div className="flex items-center gap-4">
-          {term.comment_count > 0 && (
-            <div className="flex items-center gap-1 text-stone-400 font-bold text-[10px] uppercase tracking-widest">
-              <MessageSquare className="w-3 h-3" />
-              <span>{term.comment_count}</span>
-            </div>
-          )}
-          
           <Link to={`/term/${term.id}`} className="flex items-center gap-1 text-emerald-600 font-bold text-sm hover:underline shrink-0">
             <span>Подробнее</span>
             <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
