@@ -157,6 +157,11 @@ async function initDb(forceReinstall = false) {
         console.log(`Migration: Added '${col.column}' column to '${col.table}' table.`);
       } catch (e) { /* ignore if already exists */ }
     }
+    
+    try {
+      await client.exec(`ALTER TABLE courses ADD COLUMN image_url TEXT`);
+      console.log(`Migration: Added 'image_url' column to 'courses' table.`);
+    } catch (e) { /* ignore if already exists */ }
 
     console.log("Table 'users' ready.");
 
@@ -550,7 +555,7 @@ async function startServer() {
     if (!req.user) return res.status(401).json({ error: "Unauthorized" });
     const userRes = await pool.query("SELECT subscription_tier, role FROM users WHERE id = $1", [req.user.id]);
     const user = userRes.rows[0];
-    if (user.subscription_tier === 'pro' || user.role === 'super_admin' || user.role === 'chief_editor') {
+    if (user.subscription_tier === 'pro' || user.role === 'admin' || user.role === 'teacher' || user.role === 'super_admin' || user.role === 'chief_editor') {
       next();
     } else {
       res.status(403).json({ error: "Pro subscription required", is_pro_needed: true });
@@ -733,6 +738,7 @@ async function startServer() {
 
   // +++ EDUCATIONAL COURSES & LECTURES API (MANAGEMENT) +++
   app.post("/api/courses", authenticateToken, requirePro, async (req, res) => {
+    console.log("POST /api/courses req.body", req.body);
     const { subject_id, title_ru, title_tyv, description_ru, description_tyv, image_url } = req.body;
     const id = Math.random().toString(36).substr(2, 9);
     try {
@@ -742,6 +748,7 @@ async function startServer() {
       );
       res.json({ id, success: true });
     } catch (error) {
+      console.error("POST /api/courses error:", error);
       res.status(500).json({ error: "Failed to create course" });
     }
   });
