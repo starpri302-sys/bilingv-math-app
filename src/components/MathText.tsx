@@ -1,4 +1,5 @@
 import React from 'react';
+import { parseVideoUrl, videoRegex } from '../utils/video';
 
 interface MathTextProps {
   text: string;
@@ -24,20 +25,16 @@ export default function MathText({ text, className, as: Component = 'span', isHt
     const processedHtml = text.replace(/<[^>]+>|[^<]+/g, (match) => {
       if (match.startsWith('<')) return match; // Skip HTML tags
       
-      const videoRegex = /(https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|vimeo\.com)\/\S+)/g;
       const parts = match.split(videoRegex);
       
       return parts.map((part, index) => {
         if (index % 2 === 1) { // It's a video URL
-          let embedUrl = part;
-          if (part.includes('youtube.com') || part.includes('youtu.be')) {
-            const videoId = part.split('v=')[1]?.split('&')[0] || part.split('/').pop();
-            embedUrl = `https://www.youtube.com/embed/${videoId}`;
-          } else if (part.includes('vimeo.com')) {
-            const videoId = part.split('/').pop();
-            embedUrl = `https://player.vimeo.com/video/${videoId}`;
+          const parsed = parseVideoUrl(part);
+          if (parsed.type === 'direct') {
+            return `<div class="my-8 rounded-3xl overflow-hidden shadow-xl aspect-video bg-black"><video src="${parsed.embedUrl}" controls class="w-full h-full"></video></div>`;
+          } else {
+            return `<div class="my-8 rounded-3xl overflow-hidden shadow-xl aspect-video bg-black"><iframe class="w-full h-full" src="${parsed.embedUrl}" allowfullscreen allow="autoplay; encrypted-media; fullscreen; picture-in-picture;" frameborder="0"></iframe></div>`;
           }
-          return `<div class="my-8 rounded-3xl overflow-hidden shadow-xl aspect-video bg-black"><iframe class="w-full h-full" src="${embedUrl}" allowfullscreen></iframe></div>`;
         } else {
           // Process text for numbers and symbols in a single pass to avoid corrupting injected HTML
           return part.replace(/(\b\d+\b)|([\+\-\=\>\<\*\/\^√])/g, (m, digit, symbol) => {
@@ -60,24 +57,24 @@ export default function MathText({ text, className, as: Component = 'span', isHt
   // Plain text processing
   const renderTextWithDigits = (rawText: string) => {
     // Handle video links first
-    const videoRegex = /(https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|vimeo\.com)\/\S+)/g;
     const parts = rawText.split(videoRegex);
     
     return parts.map((part, index) => {
       if (index % 2 === 1) { // It's a video URL
-        let embedUrl = part;
-        if (part.includes('youtube.com') || part.includes('youtu.be')) {
-          const videoId = part.split('v=')[1]?.split('&')[0] || part.split('/').pop();
-          embedUrl = `https://www.youtube.com/embed/${videoId}`;
-        } else if (part.includes('vimeo.com')) {
-          const videoId = part.split('/').pop();
-          embedUrl = `https://player.vimeo.com/video/${videoId}`;
+        const parsed = parseVideoUrl(part);
+        if (parsed.type === 'direct') {
+          return (
+            <div key={index} className="my-8 rounded-3xl overflow-hidden shadow-xl aspect-video bg-black">
+              <video src={parsed.embedUrl} controls className="w-full h-full" />
+            </div>
+          );
+        } else {
+          return (
+            <div key={index} className="my-8 rounded-3xl overflow-hidden shadow-xl aspect-video bg-black/5 flex items-center justify-center relative">
+              <iframe className="w-full h-full rounded-3xl absolute inset-0" src={parsed.embedUrl} allowFullScreen allow="autoplay; encrypted-media; fullscreen; picture-in-picture;" frameBorder="0" />
+            </div>
+          );
         }
-        return (
-          <div key={index} className="my-8 rounded-3xl overflow-hidden shadow-xl aspect-video bg-black">
-            <iframe className="w-full h-full" src={embedUrl} allowFullScreen />
-          </div>
-        );
       }
 
       const textParts = part.split(/(\d+|\+|-|=|>|<|\*|\/|\^|√)/g);

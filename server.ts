@@ -108,9 +108,12 @@ async function initDb(forceReinstall = false) {
     if (forceReinstall) {
       console.log("!!! FORCE REINSTALL: Dropping all tables...");
       const tables = [
-        'notifications', 'comments', 'term_versions', 'logs', 
-        'password_resets', 'term_translations', 'terms', 
-        'languages', 'subjects', 'users'
+        'quiz_options', 'quiz_questions', 'lecture_quizzes', 'assignment_submissions', 
+        'assignments', 'class_courses', 'class_enrollments', 'classes', 
+        'lecture_completions', 'lecture_comments', 'lecture_resources', 'lectures', 
+        'course_modules', 'courses', 'term_translations', 'term_versions', 
+        'comments', 'favorites', 'notifications', 'academic_requests', 'terms', 
+        'languages', 'subjects', 'users', 'logs', 'password_resets'
       ];
       
       for (const table of tables) {
@@ -126,6 +129,7 @@ async function initDb(forceReinstall = false) {
 
     console.log("Creating tables...");
 
+    // 1. Independent Tables
     await client.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
@@ -142,26 +146,40 @@ async function initDb(forceReinstall = false) {
         subscription_tier TEXT DEFAULT 'free',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS subjects (
+        id TEXT PRIMARY KEY,
+        slug TEXT UNIQUE,
+        name_ru TEXT,
+        name_tyv TEXT,
+        icon TEXT,
+        color TEXT DEFAULT '#10b981'
+      );
+
+      CREATE TABLE IF NOT EXISTS languages (
+        code TEXT PRIMARY KEY,
+        name TEXT,
+        native_name TEXT,
+        flag TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS password_resets (
+        email TEXT PRIMARY KEY,
+        token TEXT,
+        expires TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS logs (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        username TEXT,
+        action TEXT,
+        details TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
-    // Migration: Add new columns if they don't exist
-    const columnsToMigrate = [
-      { table: 'users', column: 'contact_info', type: 'TEXT' },
-      { table: 'users', column: 'bio', type: 'TEXT' },
-      { table: 'users', column: 'subscription_tier', type: 'TEXT DEFAULT \'free\'' }
-    ];
-
-    for (const col of columnsToMigrate) {
-      try {
-        await (client.query ? client.query(`ALTER TABLE ${col.table} ADD COLUMN ${col.column} ${col.type}`) : (client as any).exec(`ALTER TABLE ${col.table} ADD COLUMN ${col.column} ${col.type}`));
-        console.log(`Migration: Added '${col.column}' column to '${col.table}' table.`);
-      } catch (e) { /* ignore if already exists */ }
-    }
-    
-    console.log("Table 'users' ready.");
-
-    // ... (keep existing users logic) ...
-
+    // 2. Primary relational tables (depend on independent tables)
     await client.exec(`
       CREATE TABLE IF NOT EXISTS courses (
         id TEXT PRIMARY KEY,
@@ -175,63 +193,43 @@ async function initDb(forceReinstall = false) {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS classes (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        teacher_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        invite_code TEXT UNIQUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS academic_requests (
+        id TEXT PRIMARY KEY,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        full_name TEXT NOT NULL,
+        school TEXT NOT NULL,
+        position TEXT,
+        subjects TEXT NOT NULL,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS terms (
+        id TEXT PRIMARY KEY,
+        grade TEXT,
+        subject_id TEXT REFERENCES subjects(id),
+        created_by TEXT REFERENCES users(id),
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 3. Secondary relational tables (depend on above tables)
+    await client.exec(`
       CREATE TABLE IF NOT EXISTS course_modules (
         id TEXT PRIMARY KEY,
         course_id TEXT REFERENCES courses(id) ON DELETE CASCADE,
         title_ru TEXT,
         title_tyv TEXT,
         order_index INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS lectures (
-        id TEXT PRIMARY KEY,
-        course_id TEXT REFERENCES courses(id) ON DELETE CASCADE,
-        module_id TEXT REFERENCES course_modules(id) ON DELETE SET NULL,
-        title_ru TEXT,
-        title_tyv TEXT,
-        content_ru TEXT,
-        content_tyv TEXT,
-        order_index INTEGER,
-        is_free INTEGER DEFAULT 0,
-        item_type TEXT DEFAULT 'theory',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS lecture_resources (
-        id TEXT PRIMARY KEY,
-        lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
-        title TEXT,
-        url TEXT,
-        type TEXT, -- 'pdf', 'ppt', 'link', etc.
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS lecture_comments (
-        id TEXT PRIMARY KEY,
-        lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
-        user_id TEXT REFERENCES users(id),
-        username TEXT,
-        avatar TEXT,
-        content TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS lecture_completions (
-        id TEXT PRIMARY KEY,
-        user_id TEXT REFERENCES users(id),
-        lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
-        score INTEGER,
-        max_score INTEGER,
-        completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(user_id, lecture_id)
-      );
-
-      CREATE TABLE IF NOT EXISTS classes (
-        id TEXT PRIMARY KEY,
-        name TEXT,
-        teacher_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-        invite_code TEXT UNIQUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -247,110 +245,6 @@ async function initDb(forceReinstall = false) {
         course_id TEXT REFERENCES courses(id) ON DELETE CASCADE,
         assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY(class_id, course_id)
-      );
-
-      CREATE TABLE IF NOT EXISTS assignments (
-        id TEXT PRIMARY KEY,
-        class_id TEXT REFERENCES classes(id) ON DELETE CASCADE,
-        lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
-        due_date TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS assignment_submissions (
-        id TEXT PRIMARY KEY,
-        assignment_id TEXT REFERENCES assignments(id) ON DELETE CASCADE,
-        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-        score INTEGER,
-        max_score INTEGER,
-        status TEXT DEFAULT 'submitted', -- 'submitted', 'graded'
-        submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(assignment_id, user_id)
-      );
-
-      CREATE TABLE IF NOT EXISTS lecture_quizzes (
-        id TEXT PRIMARY KEY,
-        lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
-        title_ru TEXT,
-        title_tyv TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    await client.exec(`
-      CREATE TABLE IF NOT EXISTS quiz_questions (
-        id TEXT PRIMARY KEY,
-        quiz_id TEXT REFERENCES lecture_quizzes(id) ON DELETE CASCADE,
-        question_ru TEXT,
-        question_tyv TEXT,
-        explanation_ru TEXT,
-        explanation_tyv TEXT,
-        order_index INTEGER
-      );
-
-      CREATE TABLE IF NOT EXISTS quiz_options (
-        id TEXT PRIMARY KEY,
-        question_id TEXT REFERENCES quiz_questions(id) ON DELETE CASCADE,
-        text_ru TEXT,
-        text_tyv TEXT,
-        is_correct INTEGER DEFAULT 0
-      );
-    `);
-
-    await client.query(`
-      INSERT INTO users (id, username, email, role, full_name) 
-      VALUES ('system', 'system', 'system@system.com', 'super_admin', 'System')
-      ON CONFLICT (id) DO NOTHING
-    `);
-
-    const adminPassword = await bcrypt.hash("admin123", 10);
-    await client.query(`
-      INSERT INTO users (id, username, email, role, full_name, password) 
-      VALUES ($1, $2, $3, $4, $5, $6)
-      ON CONFLICT (id) DO NOTHING
-    `, ['admin', 'admin', 'starpri302@gmail.com', 'super_admin', 'Admin', adminPassword]);
-    console.log("Default users ready.");
-
-    await client.exec(`
-      CREATE TABLE IF NOT EXISTS subjects (
-        id TEXT PRIMARY KEY,
-        slug TEXT UNIQUE,
-        name_ru TEXT,
-        name_tyv TEXT,
-        icon TEXT,
-        color TEXT
-      );
-    `);
-
-    try { await client.exec(`ALTER TABLE lectures ADD COLUMN visibility TEXT DEFAULT 'public'`); } catch (e) {}
-    try { await client.exec(`ALTER TABLE lectures ADD COLUMN access_type TEXT DEFAULT 'free'`); } catch (e) {}
-    try { await client.exec(`ALTER TABLE subjects ADD COLUMN color TEXT DEFAULT '#10b981'`); } catch (e) {}
-
-    await client.exec(`
-      CREATE TABLE IF NOT EXISTS lecture_access (
-        id TEXT PRIMARY KEY,
-        lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
-        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-        expires_at TIMESTAMP,
-        granted_by TEXT REFERENCES users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT lecture_user_unique UNIQUE (lecture_id, user_id)
-      );
-
-      CREATE TABLE IF NOT EXISTS languages (
-        code TEXT PRIMARY KEY,
-        name TEXT,
-        native_name TEXT,
-        flag TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS terms (
-        id TEXT PRIMARY KEY,
-        grade TEXT,
-        subject_id TEXT REFERENCES subjects(id),
-        created_by TEXT REFERENCES users(id),
-        status TEXT DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
       CREATE TABLE IF NOT EXISTS term_translations (
@@ -389,21 +283,6 @@ async function initDb(forceReinstall = false) {
         PRIMARY KEY(user_id, term_id)
       );
 
-      CREATE TABLE IF NOT EXISTS password_resets (
-        email TEXT PRIMARY KEY,
-        token TEXT,
-        expires TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS logs (
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        username TEXT,
-        action TEXT,
-        details TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-
       CREATE TABLE IF NOT EXISTS notifications (
         id TEXT PRIMARY KEY,
         user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
@@ -413,24 +292,127 @@ async function initDb(forceReinstall = false) {
         is_read INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `);
 
-      CREATE TABLE IF NOT EXISTS academic_requests (
+    // 4. Lectures and items with complex references
+    await client.exec(`
+      CREATE TABLE IF NOT EXISTS lectures (
         id TEXT PRIMARY KEY,
-        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-        full_name TEXT NOT NULL,
-        school TEXT NOT NULL,
-        position TEXT,
-        subjects TEXT NOT NULL,
-        status TEXT DEFAULT 'pending',
+        course_id TEXT REFERENCES courses(id) ON DELETE CASCADE,
+        module_id TEXT REFERENCES course_modules(id) ON DELETE SET NULL,
+        title_ru TEXT,
+        title_tyv TEXT,
+        content_ru TEXT,
+        content_tyv TEXT,
+        order_index INTEGER,
+        is_free INTEGER DEFAULT 0,
+        item_type TEXT DEFAULT 'theory',
+        visibility TEXT DEFAULT 'public',
+        access_type TEXT DEFAULT 'free',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS lecture_resources (
+        id TEXT PRIMARY KEY,
+        lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
+        title TEXT,
+        url TEXT,
+        type TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS lecture_comments (
+        id TEXT PRIMARY KEY,
+        lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
+        user_id TEXT REFERENCES users(id),
+        username TEXT,
+        avatar TEXT,
+        content TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS lecture_completions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT REFERENCES users(id),
+        lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
+        score INTEGER,
+        max_score INTEGER,
+        completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, lecture_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS assignments (
+        id TEXT PRIMARY KEY,
+        class_id TEXT REFERENCES classes(id) ON DELETE CASCADE,
+        lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
+        due_date TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS assignment_submissions (
+        id TEXT PRIMARY KEY,
+        assignment_id TEXT REFERENCES assignments(id) ON DELETE CASCADE,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        score INTEGER,
+        max_score INTEGER,
+        status TEXT DEFAULT 'submitted',
+        submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(assignment_id, user_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS lecture_quizzes (
+        id TEXT PRIMARY KEY,
+        lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
+        title_ru TEXT,
+        title_tyv TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS quiz_questions (
+        id TEXT PRIMARY KEY,
+        quiz_id TEXT REFERENCES lecture_quizzes(id) ON DELETE CASCADE,
+        question_ru TEXT,
+        question_tyv TEXT,
+        explanation_ru TEXT,
+        explanation_tyv TEXT,
+        order_index INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS quiz_options (
+        id TEXT PRIMARY KEY,
+        question_id TEXT REFERENCES quiz_questions(id) ON DELETE CASCADE,
+        text_ru TEXT,
+        text_tyv TEXT,
+        is_correct INTEGER DEFAULT 0
+      );
+
+      CREATE TABLE IF NOT EXISTS lecture_access (
+        id TEXT PRIMARY KEY,
+        lecture_id TEXT REFERENCES lectures(id) ON DELETE CASCADE,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        expires_at TIMESTAMP,
+        granted_by TEXT REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT lecture_user_unique UNIQUE (lecture_id, user_id)
+      );
     `);
-    console.log("All tables created successfully.");
 
-    try { await client.exec(`ALTER TABLE academic_requests ADD COLUMN position TEXT`); } catch (e) {}
-    try { await client.exec(`ALTER TABLE courses ADD COLUMN image_url TEXT`); } catch (e) {}
+    // 5. Seed default/system accounts
+    await client.query(`
+      INSERT INTO users (id, username, email, role, full_name) 
+      VALUES ('system', 'system', 'system@system.com', 'super_admin', 'System')
+      ON CONFLICT (id) DO NOTHING
+    `);
 
-    // Seed initial subjects and languages if empty
+    const adminPassword = await bcrypt.hash("admin123", 10);
+    await client.query(`
+      INSERT INTO users (id, username, email, role, full_name, password) 
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (id) DO NOTHING
+    `, ['admin', 'admin', 'starpri302@gmail.com', 'super_admin', 'Admin', adminPassword]);
+    console.log("Default users ready.");
+
+    // Seed initial languages if empty
     const langCountRes = await client.query("SELECT COUNT(*) as count FROM languages");
     if (parseInt(langCountRes.rows[0].count) === 0) {
       await client.query("INSERT INTO languages (code, name, native_name, flag) VALUES ($1, $2, $3, $4) ON CONFLICT (code) DO NOTHING", ["ru", "Русский", "Русский", "🇷🇺"]);
@@ -438,6 +420,7 @@ async function initDb(forceReinstall = false) {
       console.log("Languages seeded.");
     }
 
+    // Seed initial subjects if empty
     const subjectCountRes = await client.query("SELECT COUNT(*) as count FROM subjects");
     if (parseInt(subjectCountRes.rows[0].count) === 0) {
       await client.query("INSERT INTO subjects (id, slug, name_ru, name_tyv, icon) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING", ["s1", "math", "Математика", "Математика", "calculator"]);
@@ -445,6 +428,7 @@ async function initDb(forceReinstall = false) {
       await client.query("INSERT INTO subjects (id, slug, name_ru, name_tyv, icon) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING", ["s3", "it", "Информатика", "Информатика", "monitor"]);
       console.log("Subjects seeded.");
     }
+    console.log("All tables created and seeded successfully.");
   } catch (error) {
     console.error("Database initialization failed:", error);
     fs.writeFileSync("db_error.log", String(error));
@@ -588,11 +572,14 @@ async function startServer() {
       const userId = (req as any).user?.id;
       let queryStr = `
         SELECT c.*, s.name_ru as subject_name_ru, s.name_tyv as subject_name_tyv, s.color as subject_color,
-          (
-            SELECT json_group_array(json_object('id', cl.id, 'name', cl.name))
-            FROM class_courses cc
-            JOIN classes cl ON cc.class_id = cl.id
-            WHERE cc.course_id = c.id
+          COALESCE(
+            (
+              SELECT json_agg(json_build_object('id', cl.id, 'name', cl.name))
+              FROM class_courses cc
+              JOIN classes cl ON cc.class_id = cl.id
+              WHERE cc.course_id = c.id
+            )::text,
+            '[]'
           ) as assigned_classes_json
         FROM courses c 
         LEFT JOIN subjects s ON c.subject_id = s.id 

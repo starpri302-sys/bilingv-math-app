@@ -11,7 +11,7 @@ export default function Navbar() {
   const [showLoginMenu, setShowLoginMenu] = useState(false);
 
   return (
-    <nav className="bg-white/80 backdrop-blur-md border-b border-stone-200 sticky top-0 z-50">
+    <nav className="bg-white/80 backdrop-blur-md border-b border-stone-200 sticky top-0 z-50 print:hidden">
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           <div className="flex items-center gap-8">

@@ -43,6 +43,8 @@ interface EditorProps {
     resources?: Resource[];
   }) => Promise<void>;
   isSubmitting?: boolean;
+  lectureId?: string;
+  courseId?: string;
 }
 
 export default function LectureEditor({ 
@@ -56,7 +58,9 @@ export default function LectureEditor({
   initialVisibility,
   initialAccessType,
   onSave, 
-  isSubmitting = false 
+  isSubmitting = false,
+  lectureId,
+  courseId
 }: EditorProps) {
   const [titleRu, setTitleRu] = useState(initialTitleRu);
   const [titleTyv, setTitleTyv] = useState(initialTitleTyv);
@@ -71,6 +75,126 @@ export default function LectureEditor({
   const [resources, setResources] = useState<Resource[]>(initialResources);
   const [splitWidth, setSplitWidth] = useState(50); // percentage for editor area
   const [isResizing, setIsResizing] = useState(false);
+
+  // Auto-save states
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'clean' | 'saving' | 'saved' | 'restored'>('clean');
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  const [showBackupBanner, setShowBackupBanner] = useState(false);
+  const [savedDraft, setSavedDraft] = useState<any | null>(null);
+
+  const storageKey = `lecture-draft-${lectureId || 'new'}-${courseId || 'general'}`;
+  const hasEditedRef = React.useRef(false);
+
+  // Check for saved draft on mount or key change
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.updatedAt) {
+          // Check if there are actual differences from original props to avoid showing banner for identical text
+          const hasDiff = 
+            parsed.titleRu !== initialTitleRu ||
+            parsed.titleTyv !== initialTitleTyv ||
+            parsed.contentRu !== initialContentRu ||
+            parsed.contentTyv !== initialContentTyv ||
+            parsed.isFree !== initialIsFree ||
+            parsed.visibility !== (initialVisibility || 'public') ||
+            parsed.accessType !== (initialAccessType || 'free') ||
+            JSON.stringify(parsed.quizQuestions) !== JSON.stringify(initialQuiz?.questions || []) ||
+            JSON.stringify(parsed.resources) !== JSON.stringify(initialResources || []);
+
+          if (hasDiff) {
+            setSavedDraft(parsed);
+            setShowBackupBanner(true);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Checking draft failed:", e);
+    }
+  }, [storageKey, initialTitleRu, initialTitleTyv, initialContentRu, initialContentTyv, initialIsFree, initialVisibility, initialAccessType, initialQuiz, initialResources]);
+
+  // Restore the saved draft
+  const restoreDraft = () => {
+    if (savedDraft) {
+      setTitleRu(savedDraft.titleRu ?? titleRu);
+      setTitleTyv(savedDraft.titleTyv ?? titleTyv);
+      setContentRu(savedDraft.contentRu ?? contentRu);
+      setContentTyv(savedDraft.contentTyv ?? contentTyv);
+      setIsFree(savedDraft.isFree ?? isFree);
+      setVisibility(savedDraft.visibility ?? visibility);
+      setAccessType(savedDraft.accessType ?? accessType);
+      setQuizQuestions(savedDraft.quizQuestions ?? quizQuestions);
+      setResources(savedDraft.resources ?? resources);
+      
+      setAutoSaveStatus('restored');
+      setShowBackupBanner(false);
+      hasEditedRef.current = true;
+    }
+  };
+
+  // Discard the saved draft
+  const discardDraft = () => {
+    localStorage.removeItem(storageKey);
+    setShowBackupBanner(false);
+    setSavedDraft(null);
+    setAutoSaveStatus('clean');
+    hasEditedRef.current = false;
+  };
+
+  // Track edits to set edited flag
+  React.useEffect(() => {
+    const isDifferent = 
+      titleRu !== initialTitleRu ||
+      titleTyv !== initialTitleTyv ||
+      contentRu !== initialContentRu ||
+      contentTyv !== initialContentTyv ||
+      isFree !== initialIsFree ||
+      visibility !== (initialVisibility || 'public') ||
+      accessType !== (initialAccessType || 'free') ||
+      JSON.stringify(quizQuestions) !== JSON.stringify(initialQuiz?.questions || []) ||
+      JSON.stringify(resources) !== JSON.stringify(initialResources || []);
+
+    if (isDifferent) {
+      hasEditedRef.current = true;
+    }
+  }, [
+    titleRu, titleTyv, contentRu, contentTyv, isFree, visibility, accessType, quizQuestions, resources,
+    initialTitleRu, initialTitleTyv, initialContentRu, initialContentTyv, initialIsFree, initialVisibility, initialAccessType, initialQuiz, initialResources
+  ]);
+
+  // Handle debounced auto-saving
+  React.useEffect(() => {
+    if (!hasEditedRef.current) return;
+
+    setAutoSaveStatus('saving');
+    
+    const delayDebounceFn = setTimeout(() => {
+      try {
+        const draftData = {
+          updatedAt: Date.now(),
+          titleRu,
+          titleTyv,
+          contentRu,
+          contentTyv,
+          isFree,
+          visibility,
+          accessType,
+          quizQuestions,
+          resources
+        };
+        localStorage.setItem(storageKey, JSON.stringify(draftData));
+        setAutoSaveStatus('saved');
+        setLastSavedTime(new Date().toLocaleTimeString('ru-RU'));
+      } catch (err) {
+        console.error("Auto-save failed:", err);
+        setAutoSaveStatus('clean');
+      }
+    }, 1500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [titleRu, titleTyv, contentRu, contentTyv, isFree, visibility, accessType, quizQuestions, resources, storageKey]);
 
   const startResizing = (e: React.MouseEvent) => {
     setIsResizing(true);
@@ -108,19 +232,26 @@ export default function LectureEditor({
     };
   }, [isResizing]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
-      title_ru: titleRu,
-      title_tyv: titleTyv,
-      content_ru: contentRu,
-      content_tyv: contentTyv,
-      is_free: isFree,
-      visibility,
-      access_type: accessType,
-      quiz: quizQuestions.length > 0 ? { questions: quizQuestions } : undefined,
-      resources: resources.length > 0 ? resources : undefined
-    });
+    try {
+      await onSave({
+        title_ru: titleRu,
+        title_tyv: titleTyv,
+        content_ru: contentRu,
+        content_tyv: contentTyv,
+        is_free: isFree,
+        visibility,
+        access_type: accessType,
+        quiz: quizQuestions.length > 0 ? { questions: quizQuestions } : undefined,
+        resources: resources.length > 0 ? resources : undefined
+      });
+      localStorage.removeItem(storageKey);
+      setAutoSaveStatus('clean');
+      setShowBackupBanner(false);
+    } catch (err) {
+      console.error("Save failed:", err);
+    }
   };
 
   const handlePaste = (e: React.ClipboardEvent, target: 'ru' | 'tyv') => {
@@ -200,13 +331,25 @@ export default function LectureEditor({
     <div id="lecture-editor-container" className="bg-white rounded-[2.5rem] border border-stone-200 shadow-xl overflow-hidden min-h-[700px] flex flex-col">
       {/* Editor Header */}
       <div className="bg-stone-50 border-b border-stone-200 p-4 sm:px-8 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600">
-            <Edit3 className="w-5 h-5" />
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600">
+              <Edit3 className="w-5 h-5" />
+            </div>
+            <h2 className="font-serif font-black text-stone-900 tracking-tight">
+              {activeTab === 'quiz' ? 'Настройка теста' : 'Редактор лекции'}
+            </h2>
           </div>
-          <h2 className="font-serif font-black text-stone-900 tracking-tight">
-            {activeTab === 'quiz' ? 'Настройка теста' : 'Редактор лекции'}
-          </h2>
+          {autoSaveStatus !== 'clean' && (
+            <div className="text-[10px] font-bold text-stone-400 bg-stone-100/80 border border-stone-200 px-2.5 py-1 rounded-full flex items-center gap-1.5 animate-pulse select-none">
+              <div className={`w-1.5 h-1.5 rounded-full ${autoSaveStatus === 'saving' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+              <span>
+                {autoSaveStatus === 'saving' && 'Сохранение черновика...'}
+                {autoSaveStatus === 'saved' && `Черновик сохранен в ${lastSavedTime}`}
+                {autoSaveStatus === 'restored' && 'Черновик восстановлен!'}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-stone-200">
@@ -269,6 +412,32 @@ export default function LectureEditor({
           </button>
         </div>
       </div>
+
+      {showBackupBanner && savedDraft && (
+        <div className="bg-amber-50 border-b border-amber-200 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+            <div>
+              <p className="text-sm font-bold text-amber-900">Обнаружен сохраненный черновик</p>
+              <p className="text-xs text-amber-700">В локальном хранилище есть автосохранение от {new Date(savedDraft.updatedAt).toLocaleString('ru-RU')}. Хотите восстановить его?</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button 
+              onClick={restoreDraft}
+              className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm transition-all active:scale-95 duration-200"
+            >
+              Восстановить
+            </button>
+            <button 
+              onClick={discardDraft}
+              className="bg-white hover:bg-stone-100 text-stone-500 border border-stone-200 text-xs font-bold px-4 py-2 rounded-xl transition-all active:scale-95 duration-200"
+            >
+              Сбросить черновик
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Editor Body */}
       <div className="flex-grow flex flex-col md:flex-row relative">

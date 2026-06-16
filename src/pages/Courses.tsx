@@ -77,7 +77,18 @@ export default function Courses() {
   const [lectures, setLectures] = useState<Lecture[]>([]);
   const [userProgress, setUserProgress] = useState<any[]>([]);
   const [lecturesLoading, setLecturesLoading] = useState(false);
+  const [lectureSearchQuery, setLectureSearchQuery] = useState('');
   const [editingLecture, setEditingLecture] = useState<Lecture | null>(null);
+
+  const filteredLectures = lectures.filter(l => {
+    if (!lectureSearchQuery.trim()) return true;
+    const query = lectureSearchQuery.toLowerCase();
+    const matchesTitle = (l.title_ru || '').toLowerCase().includes(query) || 
+                         (l.title_tyv || '').toLowerCase().includes(query);
+    const matchesContent = (l.content_ru || '').toLowerCase().includes(query) || 
+                           (l.content_tyv || '').toLowerCase().includes(query);
+    return matchesTitle || matchesContent;
+  });
   const [createType, setCreateType] = useState<'theory' | 'test' | null>(null);
   const [showModuleModal, setShowModuleModal] = useState(false);
   const [editingModule, setEditingModule] = useState<CourseModule | null>(null);
@@ -226,6 +237,7 @@ export default function Courses() {
   }, []);
 
   useEffect(() => {
+    setLectureSearchQuery('');
     if (id) {
       const course = courses.find(c => c.id === id);
       if (course) {
@@ -625,15 +637,39 @@ export default function Courses() {
                   initialIsFree={editingLecture?.is_free === 1}
                   initialQuiz={editingLecture?.quiz}
                   initialResources={editingLecture?.resources}
+                  lectureId={editingLecture?.id}
+                  courseId={id}
                 />
               )}
             </motion.div>
           ) : (
             <div className="space-y-6">
-               <h2 className="text-2xl font-serif font-black text-stone-900 flex items-center gap-3">
-                 Материалы курса
-                 <div className="h-px bg-stone-200 flex-grow" />
-               </h2>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                   <h2 className="text-2xl font-serif font-black text-stone-900 flex items-center gap-3 shrink-0">
+                     Материалы курса
+                   </h2>
+                   
+                   {lectures.length > 0 && (
+                     <div className="relative w-full max-w-md">
+                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+                       <input 
+                         type="text"
+                         placeholder="Поиск по названию или содержанию..."
+                         value={lectureSearchQuery}
+                         onChange={(e) => { setLectureSearchQuery(e.target.value); setLecturePage(1); }}
+                         className="w-full bg-stone-50 border border-stone-200 rounded-2xl py-2.5 pl-11 pr-10 text-sm outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-medium text-stone-850"
+                       />
+                       {lectureSearchQuery && (
+                         <button
+                           onClick={() => setLectureSearchQuery('')}
+                           className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 transition-colors"
+                         >
+                           <X className="w-4 h-4" />
+                         </button>
+                       )}
+                     </div>
+                   )}
+                </div>
 
                {lecturesLoading ? (
                  <div className="space-y-4">
@@ -642,66 +678,71 @@ export default function Courses() {
                ) : (
                   <div className="space-y-12">
                     {/* Render Modules */}
-                    {modules.map((module) => (
-                      <div key={module.id} className="space-y-6">
-                        <div className="flex items-center justify-between group">
-                          <h3 className="text-xl font-serif font-black text-stone-900 flex items-center gap-3">
-                             <Layers className="w-5 h-5 text-emerald-500" />
-                             {module.title_ru}
-                          </h3>
-                          {isPro && (
-                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                               <button 
-                                 onClick={() => { setEditingModule(module); setNewModule({ title_ru: module.title_ru, title_tyv: module.title_tyv || '', order_index: module.order_index }); setShowModuleModal(true); }}
-                                 className="p-2 text-stone-400 hover:text-emerald-600"
-                               >
-                                 <Edit3 className="w-4 h-4" />
-                               </button>
-                               <button 
-                                 onClick={() => handleDeleteModule(module.id)}
-                                 className="p-2 text-stone-400 hover:text-rose-600"
-                               >
-                                 <Trash2 className="w-4 h-4" />
-                               </button>
-                            </div>
-                          )}
+                    {modules.map((module) => {
+                      const moduleLectures = filteredLectures.filter(l => l.module_id === module.id);
+                      if (lectureSearchQuery.trim() && moduleLectures.length === 0) return null;
+
+                      return (
+                        <div key={module.id} className="space-y-6">
+                          <div className="flex items-center justify-between group">
+                            <h3 className="text-xl font-serif font-black text-stone-900 flex items-center gap-3">
+                               <Layers className="w-5 h-5 text-emerald-500" />
+                               {module.title_ru}
+                            </h3>
+                            {isPro && (
+                              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                 <button 
+                                   onClick={() => { setEditingModule(module); setNewModule({ title_ru: module.title_ru, title_tyv: module.title_tyv || '', order_index: module.order_index }); setShowModuleModal(true); }}
+                                   className="p-2 text-stone-400 hover:text-emerald-600"
+                                 >
+                                   <Edit3 className="w-4 h-4" />
+                                 </button>
+                                 <button 
+                                   onClick={() => handleDeleteModule(module.id)}
+                                   className="p-2 text-stone-400 hover:text-rose-600"
+                                 >
+                                   <Trash2 className="w-4 h-4" />
+                                 </button>
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-4 ml-8 border-l-2 border-stone-100 pl-8">
+                            {moduleLectures.map((lecture, idx) => (
+                              <LectureCard 
+                                key={lecture.id} 
+                                lecture={lecture} 
+                                idx={idx} 
+                                userProgress={userProgress} 
+                                isPro={isPro}
+                                onEdit={() => {
+                                  const loadAndEdit = async () => {
+                                    const fullLec = await api.getLecture(lecture.id);
+                                    let fullQuiz = null;
+                                    let lResources = [];
+                                    try { fullQuiz = await api.getLectureQuiz(lecture.id); } catch(e) {}
+                                    try { lResources = await api.getLectureResources(lecture.id); } catch(e) {}
+                                    setEditingLecture({ ...fullLec, quiz: fullQuiz, resources: lResources });
+                                    setShowLectureEditor(true);
+                                  };
+                                  loadAndEdit();
+                                }}
+                                onDelete={() => handleDeleteLecture(lecture.id)}
+                              />
+                            ))}
+                            {moduleLectures.length === 0 && (
+                              <p className="text-xs text-stone-400 font-bold uppercase tracking-widest py-4">В этом модуле пока нет лекций</p>
+                            )}
+                          </div>
                         </div>
-                        <div className="space-y-4 ml-8 border-l-2 border-stone-100 pl-8">
-                          {lectures.filter(l => l.module_id === module.id).map((lecture, idx) => (
-                            <LectureCard 
-                              key={lecture.id} 
-                              lecture={lecture} 
-                              idx={idx} 
-                              userProgress={userProgress} 
-                              isPro={isPro}
-                              onEdit={() => {
-                                const loadAndEdit = async () => {
-                                  const fullLec = await api.getLecture(lecture.id);
-                                  let fullQuiz = null;
-                                  let lResources = [];
-                                  try { fullQuiz = await api.getLectureQuiz(lecture.id); } catch(e) {}
-                                  try { lResources = await api.getLectureResources(lecture.id); } catch(e) {}
-                                  setEditingLecture({ ...fullLec, quiz: fullQuiz, resources: lResources });
-                                  setShowLectureEditor(true);
-                                };
-                                loadAndEdit();
-                              }}
-                              onDelete={() => handleDeleteLecture(lecture.id)}
-                            />
-                          ))}
-                          {lectures.filter(l => l.module_id === module.id).length === 0 && (
-                            <p className="text-xs text-stone-400 font-bold uppercase tracking-widest py-4">В этом модуле пока нет лекций</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
 
                     {/* Uncategorized Lectures */}
-                    {lectures.filter(l => !l.module_id).length > 0 && (
+                    {filteredLectures.filter(l => !l.module_id).length > 0 && (
                       <div className="space-y-6">
                         <h3 className="text-xl font-serif font-black text-stone-400">Вне модулей</h3>
                         <div className="space-y-4">
-                          {lectures
+                          {filteredLectures
                             .filter(l => !l.module_id)
                             .slice((lecturePage - 1) * LECTURES_PER_PAGE, lecturePage * LECTURES_PER_PAGE)
                             .map((lecture, idx) => (
@@ -729,7 +770,7 @@ export default function Courses() {
                         </div>
                         <Pagination 
                           currentPage={lecturePage}
-                          totalPages={Math.ceil(lectures.filter(l => !l.module_id).length / LECTURES_PER_PAGE)}
+                          totalPages={Math.ceil(filteredLectures.filter(l => !l.module_id).length / LECTURES_PER_PAGE)}
                           onPageChange={(page) => {
                             setLecturePage(page);
                             window.scrollTo({ top: 600, behavior: 'smooth' });
@@ -738,6 +779,20 @@ export default function Courses() {
                       </div>
                     )}
                   </div>
+               )}
+
+               {lectures.length > 0 && filteredLectures.length === 0 && !lecturesLoading && (
+                 <div className="text-center py-20 bg-white rounded-[3rem] border border-stone-200">
+                    <Search className="w-12 h-12 text-stone-200 mx-auto mb-4" />
+                    <p className="text-stone-400 font-bold mb-2">Ничего не найдено</p>
+                    <p className="text-stone-400 text-xs">Попробуйте изменить поисковый запрос.</p>
+                    <button 
+                      onClick={() => setLectureSearchQuery('')}
+                      className="mt-6 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs px-5 py-3 rounded-xl transition-all"
+                    >
+                      Сбросить поиск
+                    </button>
+                 </div>
                )}
 
                {lectures.length === 0 && !lecturesLoading && (

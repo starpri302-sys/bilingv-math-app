@@ -17,7 +17,8 @@ import {
   Menu,
   GraduationCap,
   Trophy,
-  PlayCircle
+  PlayCircle,
+  Printer
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../store/authContext';
@@ -25,6 +26,7 @@ import MathText from '../components/MathText';
 import LectureQuiz from '../components/LectureQuiz';
 import SEO from '../components/SEO';
 import UserAvatar from '../components/UserAvatar';
+import { parseVideoUrl } from '../utils/video';
 
 interface Lecture {
   id: string;
@@ -94,6 +96,7 @@ export default function LectureDetail() {
   const [submitting, setSubmitting] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [isMobileSyllabusOpen, setIsMobileSyllabusOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { user, profile } = useAuth();
 
   const fetchProgress = async () => {
@@ -378,15 +381,35 @@ export default function LectureDetail() {
       />
 
       {/* Top Banner & Control Bar */}
-      <div className="sticky top-16 z-40 bg-white/80 backdrop-blur-md border-b border-stone-200 py-4 shadow-sm">
+      <div className="sticky top-16 z-40 bg-white/80 backdrop-blur-md border-b border-stone-200 py-4 shadow-sm print:hidden">
         <div className="absolute bottom-0 left-0 h-1 bg-emerald-500 transition-all duration-300" style={{ width: completed ? '100%' : '20%' }} />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <Link to={`/courses/${lecture.course_id}`} className="flex items-center gap-2 text-stone-500 hover:text-emerald-600 font-bold transition-colors">
-            <ChevronLeft className="w-5 h-5" />
-            <span className="hidden sm:inline">К списку лекций</span>
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link to={`/courses/${lecture.course_id}`} className="flex items-center gap-2 text-stone-500 hover:text-emerald-600 font-bold transition-colors">
+              <ChevronLeft className="w-5 h-5" />
+              <span className="hidden sm:inline">К списку лекций</span>
+            </Link>
+
+            <button
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className="hidden lg:flex items-center gap-2 text-stone-500 hover:text-stone-800 font-bold transition-colors text-xs px-3 py-1.5 rounded-xl hover:bg-stone-100 border border-transparent hover:border-stone-200"
+              title={isSidebarCollapsed ? "Показать программу" : "Скрыть программу"}
+            >
+              <Menu className="w-4 h-4 text-stone-400" />
+              <span>{isSidebarCollapsed ? "Показать меню" : "Во весь экран"}</span>
+            </button>
+          </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-2 text-stone-500 hover:text-emerald-600 bg-stone-100 hover:bg-stone-200/60 border border-stone-200 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all"
+              title="Печать занятия"
+            >
+              <Printer className="w-4 h-4 text-stone-400" />
+              <span className="hidden sm:inline">Печать</span>
+            </button>
+
             {/* Desktop Menu Status Toggle if needed, but simple lang selector is great */}
             <div className="flex bg-stone-100 p-1 rounded-xl border border-stone-200">
               <button
@@ -407,11 +430,11 @@ export default function LectureDetail() {
       </div>
 
       {/* Responsive Grid Structure */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 print:max-w-none print:px-0 print:mt-4">
+        <div className={`grid grid-cols-1 ${isSidebarCollapsed ? 'max-w-4xl mx-auto' : 'lg:grid-cols-4'} gap-8 items-start print:block`}>
           
           {/* Syllabus Sticky Sidebar (Desktop only) */}
-          <aside className="hidden lg:block lg:col-span-1 sticky top-28 h-[calc(100vh-10rem)] overflow-y-auto pr-2 space-y-6">
+          <aside className={`hidden lg:block ${isSidebarCollapsed ? 'hidden' : 'lg:col-span-1'} sticky top-28 h-[calc(100vh-10rem)] overflow-y-auto pr-2 space-y-6 print:hidden`}>
             <div className="bg-stone-900 text-white rounded-3xl p-6 shadow-xl space-y-4">
               <div className="flex items-center gap-2">
                 <GraduationCap className="w-5 h-5 text-emerald-400" />
@@ -445,42 +468,27 @@ export default function LectureDetail() {
           </aside>
 
           {/* Main Course Module Content Area */}
-          <main className="lg:col-span-3 space-y-8">
-            <article className="bg-white rounded-[2.5rem] border border-stone-200 shadow-sm overflow-hidden">
-              <div className="p-8 sm:p-12">
+          <main className={`${isSidebarCollapsed ? 'col-span-full' : 'lg:col-span-3'} print:col-span-full print:w-full space-y-8`}>
+            <article className="bg-white rounded-[2.5rem] border border-stone-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:rounded-none">
+              <div className="p-8 sm:p-12 print:p-0">
                 
                 {/* Visual Indicators & Module Progress Mini card */}
-                <header className="mb-12">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-stone-100">
-                    <div className="flex items-center gap-3 text-stone-400 font-bold text-[10px] uppercase tracking-[0.2em]">
-                      <FileText className="w-4 h-4 text-emerald-600" />
-                      Урок {currentIdx + 1} из {courseLectures.length}
-                    </div>
-
-                    {/* Compact Module Indicator Banner */}
-                    <div className="flex items-center gap-3.5 bg-stone-50 border border-stone-200 py-2.5 px-4.5 rounded-2xl max-w-sm">
-                      <div className="min-w-0">
-                        <p className="text-[9px] uppercase font-black text-stone-400 tracking-wider">Раздел: {activeModuleProgressPercent}%</p>
-                        <p className="text-stone-700 text-xs font-black truncate max-w-[140px] mt-0.5">{activeModuleTitle}</p>
-                      </div>
-                      <div className="w-16 bg-stone-200 rounded-full h-1.5 overflow-hidden shrink-0">
-                        <div 
-                          className="h-full rounded-full bg-emerald-500 transition-all duration-300" 
-                          style={{ width: `${activeModuleProgressPercent}%` }}
-                        />
-                      </div>
-                    </div>
+                <header className="mb-10 pb-6 border-b border-stone-100">
+                  <div className="flex items-center gap-3 text-stone-400 font-bold text-[10px] uppercase tracking-[0.2em] mb-4">
+                    <FileText className="w-4 h-4 text-emerald-600" />
+                    Урок {currentIdx + 1} из {courseLectures.length} • {activeModuleTitle}
                   </div>
 
                   {/* Course Title and Dual Language translation display */}
-                  <h1 className="text-4xl sm:text-5xl font-serif font-black text-stone-900 leading-tight mb-4">
+                  <h1 className="text-3xl sm:text-4xl font-serif font-black text-stone-900 leading-tight mb-2 tracking-tight">
                     <MathText text={lang === 'ru' ? lecture.title_ru : lecture.title_tyv} />
                   </h1>
-                  <div className="flex items-center gap-4 text-sm text-stone-400 font-medium italic">
-                    <span className="flex items-center gap-1.5 grayscale opacity-50">
-                      <Languages className="w-4 h-4" />
-                      {lang === 'ru' ? lecture.title_tyv : lecture.title_ru}
+                  
+                  <div className="text-stone-400 text-sm font-medium flex items-center gap-2 mt-3">
+                    <span className="bg-stone-100 text-stone-500 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider">
+                      {lang === 'ru' ? 'TYV' : 'RU'}
                     </span>
+                    <MathText text={lang === 'ru' ? lecture.title_tyv : lecture.title_ru} />
                   </div>
                 </header>
 
@@ -523,7 +531,7 @@ export default function LectureDetail() {
                      {visualBlocks.map((block) => (
                        <div key={block.id} className={`${block.layout === 'half' ? 'lg:w-1/2' : block.layout === 'third' ? 'lg:w-1/3' : 'w-full'}`}>
                           {block.type === 'text' && (
-                            <div className="bg-stone-50 p-8 rounded-[2rem] border border-stone-100">
+                            <div className="bg-stone-50 p-8 rounded-[2rem] border border-stone-100 lecture-content-renderer">
                                <MathText text={block.content} isHtml />
                             </div>
                           )}
@@ -589,7 +597,7 @@ export default function LectureDetail() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="prose prose-stone prose-lg max-w-none prose-p:leading-relaxed prose-headings:font-serif prose-headings:font-black"
+                      className="prose prose-stone prose-lg max-w-none prose-p:leading-relaxed prose-headings:font-serif prose-headings:font-black lecture-content-renderer"
                     >
                       <MathText 
                         text={lang === 'ru' ? lecture.content_ru : lecture.content_tyv} 
@@ -600,139 +608,136 @@ export default function LectureDetail() {
                   </AnimatePresence>
                 )}
 
-                {/* Big-format Next/Prev Lecture Navigation banner links */}
-                <div className="mt-16 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-6 pt-8 border-t border-stone-100">
-                  {prevLecture ? (
-                    <Link 
-                      to={`/lectures/${prevLecture.id}`} 
-                      className="flex-1 flex items-center gap-4 p-5 bg-stone-50 rounded-2xl border border-stone-200 hover:border-stone-400 hover:bg-stone-100/50 transition-all text-left"
-                    >
-                      <ChevronLeft className="w-6 h-6 text-stone-400 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[9px] text-stone-400 font-black uppercase tracking-widest mb-1">Предыдущий урок</p>
-                        <p className="text-stone-800 font-bold text-sm truncate">{lang === 'ru' ? prevLecture.title_ru : prevLecture.title_tyv}</p>
-                      </div>
-                    </Link>
-                  ) : (
-                    <div className="flex-1 hidden sm:block" />
-                  )}
-                  
-                  {nextLecture ? (
-                    <Link 
-                      to={`/lectures/${nextLecture.id}`} 
-                      className="flex-1 flex items-center justify-between gap-4 p-5 bg-stone-50 rounded-2xl border border-stone-200 hover:border-emerald-600 hover:bg-emerald-50/20 transition-all text-right"
-                    >
-                      <div className="min-w-0 text-left sm:text-right">
-                        <p className="text-[9px] text-stone-400 font-black uppercase tracking-widest mb-1">Следующий урок</p>
-                        <p className="text-stone-800 font-bold text-sm truncate">{lang === 'ru' ? nextLecture.title_ru : nextLecture.title_tyv}</p>
-                      </div>
-                      <ChevronRight className="w-6 h-6 text-emerald-600 shrink-0" />
-                    </Link>
-                  ) : (
-                    <Link 
-                      to={`/courses/${lecture.course_id}`} 
-                      className="flex-1 flex items-center justify-between gap-4 p-5 bg-emerald-50 text-emerald-800 rounded-2xl border border-emerald-100 hover:bg-emerald-100 transition-all text-right"
-                    >
-                      <div className="min-w-0 text-left sm:text-right">
-                        <p className="text-[9px] text-emerald-600 font-black uppercase tracking-widest mb-1">Раздел завершен!</p>
-                        <p className="font-bold text-sm">К списку занятий</p>
-                      </div>
-                      <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0 animate-pulse" />
-                    </Link>
-                  )}
-                </div>
+                {/* Lecture Resources panel rendered beautifully directly below content */}
+                {resources.length > 0 && (
+                  <div className="mt-12 pt-8 border-t border-stone-100 space-y-6">
+                     <h3 className="text-xs font-black text-stone-400 uppercase tracking-widest flex items-center gap-2">
+                       <FileText className="w-4 h-4 text-emerald-600" />
+                       Дополнительные материалы
+                     </h3>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {resources.map((res) => {
+                          if (res.type === 'video') {
+                            const parsed = parseVideoUrl(res.url);
+                            return (
+                              <div key={res.id} className="col-span-full relative bg-stone-900 rounded-2xl overflow-hidden shadow-md aspect-video border border-stone-200">
+                                 {parsed.type === 'direct' ? (
+                                   <video src={parsed.embedUrl} controls className="w-full h-full" />
+                                 ) : (
+                                   <iframe
+                                     className="w-full h-full"
+                                     src={parsed.embedUrl}
+                                     allowFullScreen
+                                     allow="autoplay; encrypted-media; fullscreen; picture-in-picture;"
+                                     frameBorder="0"
+                                   />
+                                 )}
+                                 <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-white/10">
+                                    Видео-материал
+                                 </div>
+                              </div>
+                            );
+                          } else {
+                            return (
+                              <a 
+                                key={res.id}
+                                href={res.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-4 p-4 bg-stone-50 rounded-2xl border border-stone-100 hover:border-emerald-600 hover:bg-emerald-50/20 transition-all group"
+                              >
+                                 <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-stone-400 group-hover:text-emerald-600 shadow-sm border border-stone-150">
+                                    {res.type === 'pdf' ? <FileText className="w-5 h-5 text-emerald-600" /> : <div className="w-2 h-2 bg-emerald-500 rounded-full" />}
+                                 </div>
+                                 <div className="flex-grow min-w-0">
+                                    <p className="text-xs font-bold text-stone-900 truncate">{res.title}</p>
+                                    <p className="text-[10px] text-stone-400 uppercase tracking-widest">{res.type}</p>
+                                 </div>
+                              </a>
+                            );
+                          }
+                        })}
+                     </div>
+                  </div>
+                )}
 
               </div>
 
-              {/* Lecture Resources panel */}
-              {resources.length > 0 && (
-                <div className="px-8 sm:px-12 pb-12 space-y-6 border-t border-stone-100 pt-12">
-                   <h3 className="text-xs font-black text-stone-400 uppercase tracking-widest flex items-center gap-2">
-                     <FileText className="w-4 h-4" />
-                     Дополнительные материалы
-                   </h3>
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {resources.map((res) => (
-                        res.type === 'video' ? (
-                          <div key={res.id} className="col-span-full relative bg-black rounded-3xl overflow-hidden shadow-xl aspect-video border border-stone-200">
-                             {res.url.includes('youtube.com') || res.url.includes('youtu.be') ? (
-                               <iframe
-                                 className="w-full h-full"
-                                 src={`https://www.youtube.com/embed/${res.url.split('v=')[1]?.split('&')[0] || res.url.split('/').pop()}`}
-                                 allowFullScreen
-                               />
-                             ) : res.url.includes('vimeo.com') ? (
-                               <iframe
-                                 className="w-full h-full"
-                                 src={`https://player.vimeo.com/video/${res.url.split('/').pop()}`}
-                                 allowFullScreen
-                               />
-                             ) : res.url.includes('vk.com') ? (
-                               <iframe
-                                 className="w-full h-full"
-                                 src={res.url.includes('video_ext.php') ? res.url : res.url.replace('vk.com/video', 'vk.com/video_ext.php')}
-                                 allow="autoplay; encrypted-media; fullscreen; picture-in-picture;"
-                                 allowFullScreen
-                               />
-                             ) : (
-                               <video src={res.url} controls className="w-full h-full" />
-                             )}
-                             <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-white/20">
-                                Видео-материал
-                             </div>
-                          </div>
-                        ) : (
-                          <a 
-                            key={res.id}
-                            href={res.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-4 p-4 bg-stone-50 rounded-2xl border border-stone-100 hover:border-emerald-600 hover:bg-emerald-50 transition-all group"
-                          >
-                             <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-stone-400 group-hover:text-emerald-600 shadow-sm border border-stone-100">
-                                {res.type === 'pdf' ? <FileText className="w-5 h-5" /> : <div className="w-2 h-2 bg-emerald-500 rounded-full" />}
-                             </div>
-                             <div className="flex-grow min-w-0">
-                                <p className="text-xs font-bold text-stone-900 truncate">{res.title}</p>
-                                <p className="text-[10px] text-stone-400 uppercase tracking-widest">{res.type}</p>
-                             </div>
-                          </a>
-                        )
-                      ))}
-                   </div>
-                </div>
-              )}
-
-              {/* Progress completion submit trigger panel */}
-              <div className="bg-stone-55 border-t border-stone-100 p-8 sm:p-12">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="p-6 bg-white border border-stone-200 rounded-3xl shadow-sm">
-                    <div className="p-2 bg-emerald-50 rounded-lg w-fit text-emerald-600 mb-4">
-                      <MessageSquare className="w-5 h-5" />
-                    </div>
-                    <h4 className="font-bold text-stone-900 mb-2">Обсуждение</h4>
-                    <p className="text-stone-500 text-sm">Присоединяйтесь к дискуссии ниже.</p>
-                  </div>
-                  <div className="p-6 bg-stone-900 text-white rounded-3xl shadow-xl">
-                    <div className="p-2 bg-white/10 rounded-lg w-fit text-emerald-400 mb-4">
-                      <BookOpen className="w-5 h-5" />
-                    </div>
-                    <h4 className="font-bold mb-2">Прогресс обучения</h4>
-                    <p className="text-stone-400 text-sm mb-4">
-                      {completed ? 'Вы успешно изучили этот материал!' : 'Отметьте лекцию как изученную.'}
-                    </p>
-                    {completed ? (
-                      <div className="w-full bg-emerald-600/20 text-emerald-400 rounded-xl py-3 text-xs font-black flex items-center justify-center gap-2 border border-emerald-600/30">
-                        <CheckCircle2 className="w-4 h-4" />
-                        Пройдено
+              {/* Combined Progress Completion and Navigation Dashboard */}
+              <div className="bg-stone-55 border-t border-stone-100 p-8 sm:p-12 print:hidden">
+                <div className="max-w-3xl mx-auto space-y-8">
+                  {/* Progress completion action */}
+                  <div className="bg-white rounded-[2rem] border border-stone-200 p-6 sm:p-8 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 h-full w-1.5 bg-emerald-500" />
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className={`p-3 rounded-2xl shrink-0 ${completed ? 'bg-emerald-50 text-emerald-600' : 'bg-stone-100 text-stone-400'}`}>
+                        <BookOpen className="w-6 h-6" />
                       </div>
-                    ) : (
-                      <button 
-                        onClick={() => handleComplete()}
-                        className="w-full bg-emerald-600 text-white rounded-xl py-3 text-xs font-bold hover:bg-emerald-700 transition-all active:scale-95 duration-200"
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-stone-900 text-base">Изучение занятия</h4>
+                        <p className="text-stone-500 text-sm mt-0.5">
+                          {completed ? 'Вы успешно изучили этот материал!' : 'Отметьте урок как изученный для сохранения прогресса.'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="w-full sm:w-auto shrink-0 z-10">
+                      {completed ? (
+                        <div className="bg-emerald-50 text-emerald-700 px-6 py-3.5 rounded-2xl text-sm font-black flex items-center justify-center gap-2 border border-emerald-100">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                          Раздел изучен
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={() => handleComplete()}
+                          className="w-full sm:w-auto bg-stone-900 hover:bg-emerald-600 text-white px-8 py-3.5 rounded-2xl text-sm font-bold shadow-md transition-all active:scale-95 duration-200 flex items-center justify-center gap-2"
+                        >
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          Изучено
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Elegant Prev/Next Lecture Navigation row */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+                    {prevLecture ? (
+                      <Link 
+                        to={`/lectures/${prevLecture.id}`} 
+                        className="flex-1 flex items-center gap-4 p-4.5 bg-white hover:bg-stone-50 rounded-2xl border border-stone-200 hover:border-stone-300 shadow-sm transition-all text-left"
                       >
-                        Отметить как пройденную
-                      </button>
+                        <ChevronLeft className="w-5 h-5 text-stone-400 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-[9px] text-stone-400 font-black uppercase tracking-widest mb-0.5">Предыдущий урок</p>
+                          <p className="text-stone-800 font-bold text-xs truncate">{lang === 'ru' ? prevLecture.title_ru : prevLecture.title_tyv}</p>
+                        </div>
+                      </Link>
+                    ) : (
+                      <div className="flex-1 hidden sm:block" />
+                    )}
+                    
+                    {nextLecture ? (
+                      <Link 
+                        to={`/lectures/${nextLecture.id}`} 
+                        className="flex-1 flex items-center justify-between gap-4 p-4.5 bg-white hover:bg-emerald-50/10 rounded-2xl border border-stone-200 hover:border-emerald-500/20 shadow-sm transition-all text-right"
+                      >
+                        <div className="min-w-0 text-left sm:text-right flex-grow">
+                          <p className="text-[9px] text-stone-400 font-black uppercase tracking-widest mb-0.5">Следующий урок</p>
+                          <p className="text-stone-800 font-bold text-xs truncate">{lang === 'ru' ? nextLecture.title_ru : nextLecture.title_tyv}</p>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-emerald-600 shrink-0" />
+                      </Link>
+                    ) : (
+                      <Link 
+                        to={`/courses/${lecture.course_id}`} 
+                        className="flex-1 flex items-center justify-between gap-4 p-4.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-2xl border border-emerald-150 transition-all text-right shadow-sm"
+                      >
+                        <div className="min-w-0 text-left sm:text-right flex-grow">
+                          <p className="text-[9px] text-emerald-600 font-black uppercase tracking-widest mb-0.5">Раздел завершен!</p>
+                          <p className="font-bold text-xs">Каталог разделов</p>
+                        </div>
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 animate-pulse" />
+                      </Link>
                     )}
                   </div>
                 </div>
@@ -741,7 +746,7 @@ export default function LectureDetail() {
 
             {/* Quiz module questions component */}
             {quiz && quiz.questions && quiz.questions.length > 0 && (
-              <div className="mt-16">
+              <div className="mt-16 print:hidden">
                 <LectureQuiz 
                   quiz={quiz} 
                   lang={lang} 
@@ -751,7 +756,7 @@ export default function LectureDetail() {
             )}
 
             {/* Global commenting forum support */}
-            <div className="mt-12 space-y-8">
+            <div className="mt-12 space-y-8 print:hidden">
               <div className="flex items-center gap-3">
                 <MessageSquare className="w-6 h-6 text-emerald-600" />
                 <h2 className="text-2xl font-serif font-black text-stone-900">Комментарии</h2>

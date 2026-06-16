@@ -6,7 +6,13 @@
     @apply overflow-x-hidden;
   }
   .prose {
-    @apply max-w-none w-full;
+    @apply max-w-none w-full whitespace-pre-wrap;
+    overflow-wrap: break-word !important;
+    word-break: break-all !important;
+  }
+  .prose *, .lecture-content-renderer, .lecture-content-renderer * {
+    overflow-wrap: break-word !important;
+    word-break: break-all !important;
   }
   .prose p, .prose ul, .prose ol, .prose blockquote {
     @apply max-w-none w-full;
