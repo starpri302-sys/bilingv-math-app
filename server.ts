@@ -1,3 +1,4 @@
+import logger from "./logger";
 import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
@@ -430,7 +431,7 @@ async function initDb(forceReinstall = false) {
     }
     console.log("All tables created and seeded successfully.");
   } catch (error) {
-    console.error("Database initialization failed:", error);
+    logger.error("Database initialization failed:", error);
     fs.writeFileSync("db_error.log", String(error));
     throw error;
   } finally {
@@ -486,7 +487,7 @@ async function startServer() {
 
   // Global error handler
   app.use((err: any, req: any, res: any, next: any) => {
-    console.error('Unhandled Error:', err);
+    logger.error('Unhandled Error:', err);
     if (res.headersSent) {
       return next(err);
     }

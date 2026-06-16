@@ -301,6 +301,11 @@ export default function LectureDetail() {
     ? (lang === 'ru' ? activeModuleObj.title_ru : activeModuleObj.title_tyv)
     : (lang === 'ru' ? 'Общие материалы' : 'Ниити материалдар');
 
+  const courseCompletedCount = courseLectures.filter(l => userProgress.some(p => p.lecture_id === l.id)).length;
+  const courseTotalCount = courseLectures.length;
+  const courseProgressPercent = courseTotalCount > 0 ? Math.round((courseCompletedCount / courseTotalCount) * 100) : 0;
+  const normalizedCourseProgressPercent = Math.min(courseProgressPercent, 100);
+
   // Shared Syllabus Component Renderer
   const renderSyllabus = () => (
     <div className="space-y-4">
@@ -474,9 +479,32 @@ export default function LectureDetail() {
                 
                 {/* Visual Indicators & Module Progress Mini card */}
                 <header className="mb-10 pb-6 border-b border-stone-100">
-                  <div className="flex items-center gap-3 text-stone-400 font-bold text-[10px] uppercase tracking-[0.2em] mb-4">
-                    <FileText className="w-4 h-4 text-emerald-600" />
-                    Урок {currentIdx + 1} из {courseLectures.length} • {activeModuleTitle}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                    <div className="flex items-center gap-3 text-stone-400 font-bold text-[10px] uppercase tracking-[0.2em]">
+                      <FileText className="w-4 h-4 text-emerald-600" />
+                      Урок {currentIdx + 1} из {courseLectures.length} • {activeModuleTitle}
+                    </div>
+                    {/* Course Progress Component */}
+                    {courseTotalCount > 0 && (
+                      <div className="flex items-center gap-3 bg-stone-50 border border-stone-200/60 rounded-2xl px-4 py-2 text-xs shrink-0 print:hidden select-none">
+                        <Trophy className="w-4 h-4 text-amber-500 shrink-0" />
+                        <div className="space-y-1 min-w-[120px]">
+                          <div className="flex justify-between text-[10px] font-black uppercase tracking-wider text-stone-500 gap-4">
+                            <span>Курс пройден</span>
+                            <span className="text-stone-850">{normalizedCourseProgressPercent}%</span>
+                          </div>
+                          <div className="w-full bg-stone-200 rounded-full h-1.5 overflow-hidden">
+                            <div 
+                              className="h-full rounded-full bg-emerald-500 transition-all duration-500" 
+                              style={{ width: `${normalizedCourseProgressPercent}%` }}
+                            />
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-black text-stone-500 bg-stone-100 px-2 py-1 rounded-md shrink-0">
+                          {courseCompletedCount}/{courseTotalCount}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Course Title and Dual Language translation display */}
