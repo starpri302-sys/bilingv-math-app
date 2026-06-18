@@ -485,19 +485,6 @@ async function startServer() {
   });
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-  // Global error handler
-  app.use((err: any, req: any, res: any, next: any) => {
-    logger.error('Unhandled Error:', err);
-    if (res.headersSent) {
-      return next(err);
-    }
-    res.status(500).json({ 
-      error: "Internal server error", 
-      message: err.message,
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-    });
-  });
-
   // Rate limiting
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -2693,8 +2680,15 @@ async function startServer() {
   }
 
   app.use((err: any, req: any, res: any, next: any) => {
-    console.error('Global error handler:', err);
-    res.status(500).json({ error: "Internal server error" });
+    logger.error('Global error handler:', err);
+    if (res.headersSent) {
+      return next(err);
+    }
+    res.status(err.status || 500).json({ 
+      error: "Internal server error",
+      message: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   });
 
   httpServer.listen(finalPort, "0.0.0.0", () => {
